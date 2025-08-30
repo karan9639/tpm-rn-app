@@ -1,0 +1,1 @@
+# Migration Notes\n\nAdjust endpoints in src/services/api.js to your server paths.\n
