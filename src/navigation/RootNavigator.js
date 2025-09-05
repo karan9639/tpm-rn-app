@@ -16,7 +16,7 @@ import AcknowledgementsScreen from "../screens/AcknowledgementsScreen";
 import UnauthorizedScreen from "../screens/UnauthorizedScreen";
 import RequestMaintenanceScreen from "../screens/RequestMaintenanceScreen";
 
-// ⬇️ QR screens जोड़ें
+// QR screens
 import QRScanScreen from "../screens/QRScanScreen";
 import QRDetailsScreen from "../screens/QRDetailsScreen";
 
@@ -74,9 +74,9 @@ export default function RootNavigator() {
             name="TransferAsset"
             options={{ title: "Transfer Asset" }}
           >
-            {() => (
+            {(props) => (
               <RoleBasedGuard allowedRoles={["production", "supervisor"]}>
-                <TransferAssetScreen />
+                <TransferAssetScreen {...props} />
               </RoleBasedGuard>
             )}
           </Stack.Screen>
@@ -86,6 +86,7 @@ export default function RootNavigator() {
             component={RequestMaintenanceScreen}
             options={{ title: "Request Maintenance" }}
           />
+
           <Stack.Screen
             name="MaintenanceRequests"
             component={MaintenanceRequestsScreen}
@@ -97,9 +98,9 @@ export default function RootNavigator() {
             name="UpdateProcess"
             options={{ title: "Update Process" }}
           >
-            {() => (
+            {(props) => (
               <RoleBasedGuard allowedRoles={["mechanic"]}>
-                <UpdateProcessScreen />
+                <UpdateProcessScreen {...props} />
               </RoleBasedGuard>
             )}
           </Stack.Screen>
@@ -109,26 +110,26 @@ export default function RootNavigator() {
             name="Acknowledgements"
             options={{ title: "Acknowledgements" }}
           >
-            {() => (
+            {(props) => (
               <RoleBasedGuard allowedRoles={["supervisor"]}>
-                <AcknowledgementsScreen />
+                <AcknowledgementsScreen {...props} />
               </RoleBasedGuard>
             )}
           </Stack.Screen>
 
-          {/* ⬇️ QR routes -> production only */}
+          {/* QR routes -> production only */}
           <Stack.Screen name="QRScan" options={{ title: "Scan QR Code" }}>
-            {() => (
+            {(props) => (
               <RoleBasedGuard allowedRoles={["production"]}>
-                <QRScanScreen />
+                <QRScanScreen {...props} />
               </RoleBasedGuard>
             )}
           </Stack.Screen>
 
           <Stack.Screen name="QRDetails" options={{ title: "QR Details" }}>
-            {() => (
+            {(props) => (
               <RoleBasedGuard allowedRoles={["production"]}>
-                <QRDetailsScreen />
+                <QRDetailsScreen {...props} />
               </RoleBasedGuard>
             )}
           </Stack.Screen>
