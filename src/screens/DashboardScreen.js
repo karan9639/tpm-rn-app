@@ -12,7 +12,13 @@ import { useAuth } from "../context/AuthContext";
 import { MaterialCommunityIcons, Feather } from "@expo/vector-icons";
 
 export default function DashboardScreen({ navigation }) {
-  const [stats, setStats] = useState(null);
+  const [stats, setStats] = useState({
+    totalAssets: null,
+    underMaintenance: null,
+    working: null,
+    notWorking: null,
+    special: null,
+  });
   const [loading, setLoading] = useState(true);
 
   const { user, logout } = useAuth();
@@ -21,7 +27,7 @@ export default function DashboardScreen({ navigation }) {
     .toLowerCase();
   const isProduction = roleRaw.includes("production");
 
-  // ⬇️ headerRight में Logout icon
+  // headerRight -> Logout
   useLayoutEffect(() => {
     navigation.setOptions({
       headerRight: () => (
@@ -44,7 +50,7 @@ export default function DashboardScreen({ navigation }) {
         style: "destructive",
         onPress: async () => {
           try {
-            await logout(); // AuthContext -> storage clear + state null
+            await logout();
           } catch (e) {
             Alert.alert("Error", e?.message || "Failed to logout");
           }
@@ -56,15 +62,37 @@ export default function DashboardScreen({ navigation }) {
   useEffect(() => {
     (async () => {
       try {
-        const d = await api.get_asset_counting();
-        setStats(d?.data ?? null);
-      } catch {
-        /* ignore */
+        const env = await api.get_asset_counting(); // <- your current API
+        // shape: { statusCode, data: [ { totalAssets:[{count}], byStatus:[...], underMaintenance:[{_id:true,total}], specialAssets:[{_id:'Yes', total}] } ], success }
+        const block = Array.isArray(env?.data) ? env.data[0] : env?.data || {};
+
+        const totalAssets = block?.totalAssets?.[0]?.count ?? 0;
+        const underMaintenance = block?.underMaintenance?.[0]?.total ?? 0;
+
+        const findByStatus = (label) =>
+          (block?.byStatus || []).find((x) => (x?._id || x?.id) === label)
+            ?.total ?? 0;
+
+        const working = findByStatus("Working");
+        const notWorking = findByStatus("Not Working");
+        const special = block?.specialAssets?.[0]?.total ?? 0;
+
+        setStats({
+          totalAssets,
+          underMaintenance,
+          working,
+          notWorking,
+          special,
+        });
+      } catch (e) {
+        console.log("dashboard stats error:", e?.message || e);
       } finally {
         setLoading(false);
       }
     })();
   }, []);
+
+  const show = (v) => (v === null || v === undefined ? "—" : String(v));
 
   return (
     <View style={{ flex: 1 }}>
@@ -81,8 +109,12 @@ export default function DashboardScreen({ navigation }) {
           <ActivityIndicator />
         ) : (
           <View style={{ marginBottom: 16 }}>
-            <Text>Total Assets: {stats?.totalAssets ?? "—"}</Text>
-            <Text>Under Maintenance: {stats?.underMaintenance ?? "—"}</Text>
+            <Text>Total Assets: {show(stats.totalAssets)}</Text>
+            <Text>Under Maintenance: {show(stats.underMaintenance)}</Text>
+            {/* चाहें तो ये भी दिखाएँ: */}
+            {/* <Text>Working: {show(stats.working)}</Text>
+            <Text>Not Working: {show(stats.notWorking)}</Text>
+            <Text>Special Assets: {show(stats.special)}</Text> */}
           </View>
         )}
 
@@ -99,17 +131,9 @@ export default function DashboardScreen({ navigation }) {
         >
           <Text style={styles.btnOutlineText}>Maintenance Requests</Text>
         </TouchableOpacity>
-
-        {/* (Optional) स्क्रीन के अंदर भी Logout बटन */}
-        {/* <TouchableOpacity
-          style={[styles.btnOutline, { marginTop: 16 }]}
-          onPress={confirmLogout}
-        >
-          <Text style={styles.btnOutlineText}>Logout</Text>
-        </TouchableOpacity> */}
       </View>
 
-      {/* ✅ QR FAB — सिर्फ production के लिए */}
+      {/* QR FAB — केवल production */}
       {isProduction && (
         <TouchableOpacity
           activeOpacity={0.9}
