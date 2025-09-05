@@ -1,31 +1,23 @@
 import React, { useEffect, useState } from "react";
 import { View, Text, ActivityIndicator, FlatList } from "react-native";
 import * as api from "../services/api";
-import { useAuth } from "../context/AuthContext";
 
-export default function MaintenanceRequestsScreen() {
-  const { user } = useAuth();
-  const role = (user?.role || "").toLowerCase();
-
+export default function AcknowledgementsScreen({ route }) {
+  const assetId = route?.params?.assetId;
   const [loading, setLoading] = useState(true);
   const [items, setItems] = useState([]);
 
   useEffect(() => {
     (async () => {
       try {
-        let env;
-        if (role === "supervisor")
-          env = await api.get_all_maintenance_requests();
-        else if (role === "mechanic")
-          env = await api.get_my_assigned_maintenances();
-        else env = await api.get_all_requests_with_mechanic(); // production
+        const env = await api.get_acknowledgements(assetId);
         setItems(env?.data || []);
       } catch {
       } finally {
         setLoading(false);
       }
     })();
-  }, [role]);
+  }, [assetId]);
 
   if (loading)
     return (
@@ -50,21 +42,18 @@ export default function MaintenanceRequestsScreen() {
           }}
         >
           <Text style={{ fontWeight: "700" }}>
-            {item.assetName || item.asset?.assetName || "Asset"}
+            {item.title || "Acknowledgement"}
           </Text>
-          <Text style={{ color: "#6b7280" }}>
-            {item.description || item.issue || "—"}
-          </Text>
+          <Text style={{ color: "#6b7280" }}>{item.message || "—"}</Text>
           <Text style={{ marginTop: 4 }}>
-            Status: {item.status || (item.closed ? "Closed" : "Open")}
+            By: {item.by || item.sender || "—"}
           </Text>
-          {item.assignedMechanicName ? (
-            <Text>Mechanic: {item.assignedMechanicName}</Text>
-          ) : null}
         </View>
       )}
       ListEmptyComponent={
-        <Text style={{ textAlign: "center", marginTop: 20 }}>No requests</Text>
+        <Text style={{ textAlign: "center", marginTop: 20 }}>
+          No acknowledgements
+        </Text>
       }
     />
   );
