@@ -1,28 +1,57 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useLayoutEffect } from "react";
 import {
   View,
   Text,
   ActivityIndicator,
   TouchableOpacity,
   StyleSheet,
+  Alert,
 } from "react-native";
 import * as api from "../services/api";
 import { useAuth } from "../context/AuthContext";
-import { MaterialCommunityIcons } from "@expo/vector-icons";
+import { MaterialCommunityIcons, Feather } from "@expo/vector-icons";
 
 export default function DashboardScreen({ navigation }) {
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // ⬇️ auth se role लो
-  const { user } = useAuth();
-
-  // role robust तरीके से detect (अगर backend ने अलग field दी हो)
+  const { user, logout } = useAuth();
   const roleRaw = (user?.role ?? user?.accountType ?? user?.employeeType ?? "")
     .toString()
     .toLowerCase();
-
   const isProduction = roleRaw.includes("production");
+
+  // ⬇️ headerRight में Logout icon
+  useLayoutEffect(() => {
+    navigation.setOptions({
+      headerRight: () => (
+        <TouchableOpacity
+          onPress={confirmLogout}
+          style={{ paddingHorizontal: 8, paddingVertical: 6 }}
+          accessibilityLabel="Logout"
+        >
+          <Feather name="log-out" size={20} color="#111827" />
+        </TouchableOpacity>
+      ),
+    });
+  }, [navigation]);
+
+  const confirmLogout = () => {
+    Alert.alert("Logout", "Are you sure you want to logout?", [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Logout",
+        style: "destructive",
+        onPress: async () => {
+          try {
+            await logout(); // AuthContext -> storage clear + state null
+          } catch (e) {
+            Alert.alert("Error", e?.message || "Failed to logout");
+          }
+        },
+      },
+    ]);
+  };
 
   useEffect(() => {
     (async () => {
@@ -44,7 +73,6 @@ export default function DashboardScreen({ navigation }) {
         <Text style={{ fontSize: 20, fontWeight: "700", marginBottom: 4 }}>
           Dashboard
         </Text>
-        {/* (optional) debug role दिखाने के लिए */}
         <Text style={{ color: "#6b7280", marginBottom: 12 }}>
           Role: {roleRaw || "—"}
         </Text>
@@ -71,6 +99,14 @@ export default function DashboardScreen({ navigation }) {
         >
           <Text style={styles.btnOutlineText}>Maintenance Requests</Text>
         </TouchableOpacity>
+
+        {/* (Optional) स्क्रीन के अंदर भी Logout बटन */}
+        {/* <TouchableOpacity
+          style={[styles.btnOutline, { marginTop: 16 }]}
+          onPress={confirmLogout}
+        >
+          <Text style={styles.btnOutlineText}>Logout</Text>
+        </TouchableOpacity> */}
       </View>
 
       {/* ✅ QR FAB — सिर्फ production के लिए */}
