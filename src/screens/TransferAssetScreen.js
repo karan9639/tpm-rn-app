@@ -28,17 +28,26 @@ function Row({
 }) {
   const isExpanded = expandedIds.has(node.id);
   const isLoading = !!loadingNodeIds[node.id];
-  const isSelected = selectedId === node.id;
+  const isLeaf = !node.hasChildren;
+  const isSelectedLeaf = isLeaf && selectedId === node.id;
+
+  const handleLabelPress = () => {
+    if (node.hasChildren) onToggle(node); // parents only toggle
+    else onSelect(node); // leaves select
+  };
 
   return (
     <View style={{ paddingLeft: level * 14 }}>
       <View
         style={[
           styles.row,
-          isSelected && { backgroundColor: "#E8F1FF", borderColor: "#BFD7FF" },
+          isSelectedLeaf && {
+            backgroundColor: "#E8F1FF",
+            borderColor: "#BFD7FF",
+          },
         ]}
       >
-        {/* Chevron tap target ONLY toggles */}
+        {/* Chevron toggles expand/collapse for parents */}
         <TouchableOpacity
           onPress={() => node.hasChildren && onToggle(node)}
           activeOpacity={0.8}
@@ -57,15 +66,22 @@ function Row({
           )}
         </TouchableOpacity>
 
-        {/* Label tap target ALWAYS selects */}
+        {/* Label: parents toggle, leaves select */}
         <TouchableOpacity
-          style={{ flex: 1, paddingVertical: 10 }}
+          style={[
+            styles.labelBox,
+            !isLeaf && styles.parentChip, // faint chip for parent rows
+          ]}
           activeOpacity={0.8}
-          onPress={() => onSelect(node)}
+          onPress={handleLabelPress}
         >
           <Text
             numberOfLines={1}
-            style={{ color: "#111827", fontWeight: isSelected ? "700" : "500" }}
+            style={[
+              styles.labelText,
+              isSelectedLeaf && { fontWeight: "700", color: "#111827" },
+              !isLeaf && { color: "#374151" },
+            ]}
           >
             {node.label}
           </Text>
@@ -103,7 +119,7 @@ export default function TransferAssetScreen({ route, navigation }) {
   const [loadingTree, setLoadingTree] = useState(false);
 
   // form state
-  const [selected, setSelected] = useState(null);
+  const [selected, setSelected] = useState(null); // leaf only
   const [remark, setRemark] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
@@ -111,23 +127,19 @@ export default function TransferAssetScreen({ route, navigation }) {
     navigation?.setOptions?.({ title: "Transfer Asset" });
   }, [navigation]);
 
-  // --- helpers
+  // helper: check if a node has children
   const ensureHasChildren = async (id) => {
     try {
       const res = await hr_location_get_location(id);
       const detail = res?.data?.[0];
       const kids = Array.isArray(detail?.children) ? detail.children : [];
-      return {
-        hasChildren: kids.length > 0,
-        rawChildren: kids,
-      };
+      return { hasChildren: kids.length > 0, rawChildren: kids };
     } catch {
-      // If in doubt, say no children; user can still select this node.
       return { hasChildren: false, rawChildren: [] };
     }
   };
 
-  // load root
+  // load roots
   useEffect(() => {
     if (!asset) return;
     (async () => {
@@ -140,7 +152,7 @@ export default function TransferAssetScreen({ route, navigation }) {
             return {
               id: loc._id,
               label: loc.locationName,
-              children: [], // filled when expanded
+              children: [],
               hasChildren: chk.hasChildren,
             };
           })
@@ -155,53 +167,6 @@ export default function TransferAssetScreen({ route, navigation }) {
     })();
   }, [asset]);
 
-  const toggleNode = useCallback(
-    async (node) => {
-      const newSet = new Set(expandedIds);
-      const willExpand = !newSet.has(node.id);
-      if (willExpand) newSet.add(node.id);
-      else newSet.delete(node.id);
-      setExpandedIds(newSet);
-
-      if (willExpand && node.hasChildren && node.children.length === 0) {
-        setLoadingNodeIds((p) => ({ ...p, [node.id]: true }));
-        try {
-          // get direct children and whether each child has its own children
-          const res = await hr_location_get_location(node.id);
-          const detail = res?.data?.[0];
-          const kidsRaw = Array.isArray(detail?.children)
-            ? detail.children
-            : [];
-
-          const kids = await Promise.all(
-            kidsRaw.map(async (c) => {
-              const check = await ensureHasChildren(c._id);
-              return {
-                id: c._id,
-                label: c.locationName,
-                children: [],
-                hasChildren: check.hasChildren,
-              };
-            })
-          );
-
-          // update tree
-          setTree((prev) => updateTree(prev, node.id, kids));
-        } catch (e) {
-          Alert.alert(
-            "Error",
-            e?.message || `Failed to load children for ${node.label}.`
-          );
-          newSet.delete(node.id);
-          setExpandedIds(newSet);
-        } finally {
-          setLoadingNodeIds((p) => ({ ...p, [node.id]: false }));
-        }
-      }
-    },
-    [expandedIds]
-  );
-
   const updateTree = (nodes, id, kids) =>
     nodes.map((n) =>
       n.id === id
@@ -213,6 +178,49 @@ export default function TransferAssetScreen({ route, navigation }) {
               : n.children,
           }
     );
+
+  const toggleNode = useCallback(
+    async (node) => {
+      const next = new Set(expandedIds);
+      const willExpand = !next.has(node.id);
+      if (willExpand) next.add(node.id);
+      else next.delete(node.id);
+      setExpandedIds(next);
+
+      if (willExpand && node.hasChildren && node.children.length === 0) {
+        setLoadingNodeIds((p) => ({ ...p, [node.id]: true }));
+        try {
+          const res = await hr_location_get_location(node.id);
+          const detail = res?.data?.[0];
+          const kidsRaw = Array.isArray(detail?.children)
+            ? detail.children
+            : [];
+          const kids = await Promise.all(
+            kidsRaw.map(async (c) => {
+              const check = await ensureHasChildren(c._id);
+              return {
+                id: c._id,
+                label: c.locationName,
+                children: [],
+                hasChildren: check.hasChildren,
+              };
+            })
+          );
+          setTree((prev) => updateTree(prev, node.id, kids));
+        } catch (e) {
+          Alert.alert(
+            "Error",
+            e?.message || `Failed to load children for ${node.label}.`
+          );
+          next.delete(node.id);
+          setExpandedIds(next);
+        } finally {
+          setLoadingNodeIds((p) => ({ ...p, [node.id]: false }));
+        }
+      }
+    },
+    [expandedIds]
+  );
 
   const canSubmit = useMemo(
     () => !!selected && remark.trim().length > 0 && !submitting,
@@ -272,7 +280,7 @@ export default function TransferAssetScreen({ route, navigation }) {
 
   return (
     <ScrollView style={{ flex: 1 }}>
-      {/* Asset summary card (same as before, trimmed) */}
+      {/* Asset card */}
       <View style={styles.card}>
         <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
           <View style={styles.iconBox}>
@@ -342,7 +350,7 @@ export default function TransferAssetScreen({ route, navigation }) {
                 loadingNodeIds={loadingNodeIds}
                 selectedId={selected?.id}
                 onToggle={toggleNode}
-                onSelect={setSelected}
+                onSelect={setSelected} // will only be called for leaves
               />
             ))
           ) : (
@@ -453,6 +461,14 @@ const styles = StyleSheet.create({
     borderColor: "#fff",
   },
   chevBox: { width: 26, paddingVertical: 10, alignItems: "center" },
+  labelBox: {
+    flex: 1,
+    paddingVertical: 10,
+    paddingHorizontal: 6,
+    borderRadius: 10,
+  },
+  parentChip: { backgroundColor: "#F3F4F6" }, // subtle chip for parents
+  labelText: { color: "#111827", fontWeight: "500" },
   selectedBox: {
     marginTop: 8,
     padding: 8,
