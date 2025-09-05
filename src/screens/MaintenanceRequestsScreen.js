@@ -16,6 +16,7 @@ import {
 } from "react-native";
 import * as api from "../services/api";
 import { useAuth } from "../context/AuthContext";
+import MechanicAssignmentModal from "../components/MechanicAssignmentModal";
 
 /* -----------------------------------------------
    Helpers (status + normalizers) – aligned to web
@@ -152,7 +153,7 @@ const normalizeRequestData = (data, userRole) =>
     : [];
 
 /* -----------------------------------------------
-   Card component – mirrors web MaintenanceRequestCard
+   Small UI bits
 ------------------------------------------------- */
 const StatusChip = ({ status }) => {
   const s = (status || "").toLowerCase();
@@ -179,13 +180,19 @@ const StatusChip = ({ status }) => {
   );
 };
 
+/* -----------------------------------------------
+   Card component – behavior mirrors your web card
+------------------------------------------------- */
 const MaintenanceRequestCard = ({
   request,
   userRole,
   onRefresh,
   navigation,
 }) => {
-  // --- parse production satisfaction like web code ---
+  const [isCompleting, setIsCompleting] = useState(false);
+  const [assignOpen, setAssignOpen] = useState(false);
+
+  // Get production satisfaction status like on web
   const getProductionSatisfactionStatus = () => {
     const assetData =
       request?.assetDetails ??
@@ -223,43 +230,40 @@ const MaintenanceRequestCard = ({
   const isCompleted =
     request.status === "completed" || request.isActive === false;
 
-  // --- actions (map to your API) ---
+  // --- Actions (aligned with web) ---
   const handleMaintenanceDone = async () => {
     if (!assetDetails?._id && !assetId) {
-      Alert.alert("Error", "Asset ID not found.");
+      Alert.alert("Error", "Asset ID not found. Cannot complete maintenance.");
       return;
     }
     try {
-      // Use same API name as web if available
-      await (api.closeMaintenanceRequest
-        ? api.closeMaintenanceRequest(assetDetails?._id || assetId)
-        : api.close_maintenance_request(assetDetails?._id || assetId));
+      setIsCompleting(true);
+      const id = assetDetails?._id || assetId;
+      if (api.closeMaintenanceRequest) {
+        await api.closeMaintenanceRequest(id);
+      } else if (api.close_maintenance_request) {
+        await api.close_maintenance_request(id);
+      } else if (api.maintenanceAPI?.closeMaintenanceRequest) {
+        await api.maintenanceAPI.closeMaintenanceRequest(id);
+      }
       Alert.alert("Success", "Maintenance request completed successfully!");
       onRefresh?.();
     } catch (e) {
       Alert.alert("Error", e?.message || "Failed to complete maintenance.");
+    } finally {
+      setIsCompleting(false);
     }
   };
 
-  const handleAssign = () => {
-    // If you have an Assign screen/modal, navigate/use it here.
-    // Placeholder to keep parity with web behavior:
-    Alert.alert(
-      "Assign to Mechanic",
-      "Open your assignment screen/modal here."
-    );
-  };
-
   const handleProductionSatisfaction = () => {
-    // Open your native satisfaction modal/screen if you have one.
     Alert.alert("Machine Working", `Mark ${assetName || "asset"} as working?`, [
       { text: "Cancel", style: "cancel" },
       {
         text: "Confirm",
         onPress: async () => {
           try {
-            // Call your satisfaction API here if available
-            // await api.mark_machine_working(assetId);
+            // Optional: call your API if you have one, e.g.:
+            // await api.maintenanceAPI.setProductionSatisfied(assetId);
             onRefresh?.();
           } catch (e) {
             Alert.alert("Error", e?.message || "Failed to update status.");
@@ -270,8 +274,6 @@ const MaintenanceRequestCard = ({
   };
 
   const handleStartTask = () => {
-    // Web uses QR scan; you can do the same or go straight to UpdateProcess.
-    // If you already have a QR screen, navigate there instead.
     navigation?.navigate?.("UpdateProcess", {
       requestId: request._id,
       request,
@@ -280,6 +282,7 @@ const MaintenanceRequestCard = ({
 
   return (
     <View style={styles.card}>
+      {/* Header */}
       <View
         style={{
           flexDirection: "row",
@@ -299,8 +302,8 @@ const MaintenanceRequestCard = ({
         <StatusChip status={request.status} />
       </View>
 
+      {/* Details */}
       <View style={{ height: 8 }} />
-
       <Text style={styles.kv}>
         <Text style={styles.k}>Priority: </Text>
         <Text style={styles.v}>{request.priority || "—"}</Text>
@@ -345,64 +348,73 @@ const MaintenanceRequestCard = ({
         </Text>
       )}
 
-      {/* Actions by role */}
+      {/* Actions by role — mirrors web logic */}
       {userRole === "production" && !isCompleted && isAssigned && (
         <>
           {showProductionSatisfactionButton && (
             <TouchableOpacity
-              style={styles.btnSecondary}
+              style={styles.btnSecondaryBlue}
               onPress={handleProductionSatisfaction}
             >
-              <Text style={styles.btnSecondaryText}>Machine Working</Text>
+              <Text style={styles.btnSecondaryBlueText}>Machine Working</Text>
             </TouchableOpacity>
           )}
         </>
       )}
 
-      {userRole === "supervisor" && !isCompleted && (
-        <>
-          {!isAssigned ? (
-            <TouchableOpacity
-              style={styles.btnSecondary}
-              onPress={handleAssign}
-            >
-              <Text style={styles.btnSecondaryText}>Assign to Mechanic</Text>
-            </TouchableOpacity>
-          ) : (
-            <TouchableOpacity
-              style={[
-                styles.btnPrimary,
-                !isProductionSatisfied && { opacity: 0.5 },
-              ]}
-              disabled={!isProductionSatisfied}
-              onPress={handleMaintenanceDone}
-            >
-              <Text style={styles.btnPrimaryText}>Maintenance Done</Text>
-            </TouchableOpacity>
+      {userRole === "supervisor" && (
+        <View>
+          {!isCompleted && (
+            <>
+              {!isAssigned ? (
+                <TouchableOpacity
+                  style={styles.btnSecondary}
+                  onPress={() => setAssignOpen(true)}
+                >
+                  <Text style={styles.btnSecondaryText}>
+                    Assign to Mechanic
+                  </Text>
+                </TouchableOpacity>
+              ) : (
+                <TouchableOpacity
+                  style={[
+                    styles.btnPrimary,
+                    (isCompleting || !isProductionSatisfied) && {
+                      opacity: 0.5,
+                    },
+                  ]}
+                  disabled={isCompleting || !isProductionSatisfied}
+                  onPress={handleMaintenanceDone}
+                >
+                  {isCompleting ? (
+                    <ActivityIndicator color="#fff" />
+                  ) : (
+                    <Text style={styles.btnPrimaryText}>Maintenance Done</Text>
+                  )}
+                </TouchableOpacity>
+              )}
+            </>
           )}
 
           {!!acknowledgementId && (
             <TouchableOpacity
-              style={[
-                styles.btnSecondary,
-                { backgroundColor: "#F5F3FF", borderColor: "#DDD6FE" },
-              ]}
+              style={styles.btnSecondaryPurple}
               onPress={() =>
                 navigation?.navigate?.("Acknowledgements", {
                   assetId: assetDetails?._id || assetId,
                 })
               }
             >
-              <Text style={[styles.btnSecondaryText, { color: "#6D28D9" }]}>
+              <Text style={styles.btnSecondaryPurpleText}>
                 View Acknowledgements
               </Text>
             </TouchableOpacity>
           )}
-        </>
+        </View>
       )}
 
       {userRole === "mechanic" && !isCompleted && (
-        <>
+        <View>
           {acknowledgementId ? (
             <TouchableOpacity
               style={styles.btnSecondary}
@@ -423,8 +435,19 @@ const MaintenanceRequestCard = ({
               <Text style={styles.btnPrimaryText}>Start Task</Text>
             </TouchableOpacity>
           )}
-        </>
+        </View>
       )}
+
+      {/* Mechanic Assignment Modal (RN) */}
+      <MechanicAssignmentModal
+        isOpen={assignOpen}
+        onClose={() => setAssignOpen(false)}
+        request={request}
+        onSuccess={() => {
+          setAssignOpen(false);
+          onRefresh?.();
+        }}
+      />
     </View>
   );
 };
@@ -665,11 +688,33 @@ const styles = StyleSheet.create({
   btnSecondary: {
     marginTop: 10,
     borderWidth: 1,
+    borderColor: "#E5E7EB",
+    backgroundColor: "#FFFFFF",
+    borderRadius: 10,
+    paddingVertical: 12,
+    alignItems: "center",
+  },
+  btnSecondaryText: { color: "#111827", fontWeight: "700" },
+
+  btnSecondaryBlue: {
+    marginTop: 10,
+    borderWidth: 1,
     borderColor: "#BFDBFE",
     backgroundColor: "#EFF6FF",
     borderRadius: 10,
     paddingVertical: 12,
     alignItems: "center",
   },
-  btnSecondaryText: { color: "#1D4ED8", fontWeight: "700" },
+  btnSecondaryBlueText: { color: "#1D4ED8", fontWeight: "700" },
+
+  btnSecondaryPurple: {
+    marginTop: 10,
+    borderWidth: 1,
+    borderColor: "#DDD6FE",
+    backgroundColor: "#F5F3FF",
+    borderRadius: 10,
+    paddingVertical: 12,
+    alignItems: "center",
+  },
+  btnSecondaryPurpleText: { color: "#6D28D9", fontWeight: "700" },
 });
