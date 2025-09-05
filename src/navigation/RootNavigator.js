@@ -16,6 +16,10 @@ import AcknowledgementsScreen from "../screens/AcknowledgementsScreen";
 import UnauthorizedScreen from "../screens/UnauthorizedScreen";
 import RequestMaintenanceScreen from "../screens/RequestMaintenanceScreen";
 
+// ⬇️ QR screens जोड़ें
+import QRScanScreen from "../screens/QRScanScreen";
+import QRDetailsScreen from "../screens/QRDetailsScreen";
+
 const Stack = createNativeStackNavigator();
 
 const RoleBasedGuard = ({ allowedRoles, children }) => {
@@ -49,25 +53,23 @@ export default function RootNavigator() {
         />
       ) : (
         <>
-          {/* web: /dashboard */}
           <Stack.Screen
             name="Dashboard"
             component={DashboardScreen}
             options={{ title: "Dashboard" }}
           />
-          {/* web: /dashboard/assets */}
           <Stack.Screen
             name="Assets"
             component={AssetScreen}
             options={{ title: "Assets" }}
           />
-          {/* web: /dashboard/asset-details/:assetId */}
           <Stack.Screen
             name="AssetDetails"
             component={AssetDetailsScreen}
             options={{ title: "Asset Details" }}
           />
-          {/* web: /dashboard/transfer-asset  -> production + supervisor */}
+
+          {/* Transfer -> production + supervisor */}
           <Stack.Screen
             name="TransferAsset"
             options={{ title: "Transfer Asset" }}
@@ -78,19 +80,19 @@ export default function RootNavigator() {
               </RoleBasedGuard>
             )}
           </Stack.Screen>
-          {/* equivalent for Request Maintenance (modal on web) */}
+
           <Stack.Screen
             name="RequestMaintenance"
             component={RequestMaintenanceScreen}
             options={{ title: "Request Maintenance" }}
           />
-          {/* web: /dashboard/maintenance-requests (open to all signed in) */}
           <Stack.Screen
             name="MaintenanceRequests"
             component={MaintenanceRequestsScreen}
             options={{ title: "Maintenance Requests" }}
           />
-          {/* web: /dashboard/update-process -> mechanic only */}
+
+          {/* Update Process -> mechanic only */}
           <Stack.Screen
             name="UpdateProcess"
             options={{ title: "Update Process" }}
@@ -101,7 +103,8 @@ export default function RootNavigator() {
               </RoleBasedGuard>
             )}
           </Stack.Screen>
-          {/* web: /dashboard/acknowledgements/:assetId -> supervisor only */}
+
+          {/* Acknowledgements -> supervisor only */}
           <Stack.Screen
             name="Acknowledgements"
             options={{ title: "Acknowledgements" }}
@@ -112,6 +115,24 @@ export default function RootNavigator() {
               </RoleBasedGuard>
             )}
           </Stack.Screen>
+
+          {/* ⬇️ QR routes -> production only */}
+          <Stack.Screen name="QRScan" options={{ title: "Scan QR Code" }}>
+            {() => (
+              <RoleBasedGuard allowedRoles={["production"]}>
+                <QRScanScreen />
+              </RoleBasedGuard>
+            )}
+          </Stack.Screen>
+
+          <Stack.Screen name="QRDetails" options={{ title: "QR Details" }}>
+            {() => (
+              <RoleBasedGuard allowedRoles={["production"]}>
+                <QRDetailsScreen />
+              </RoleBasedGuard>
+            )}
+          </Stack.Screen>
+
           <Stack.Screen
             name="Unauthorized"
             component={UnauthorizedScreen}
