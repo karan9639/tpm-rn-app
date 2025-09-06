@@ -50,7 +50,8 @@ export default function AssetScreen({ navigation }) {
           }}
         >
           <Text style={{ fontWeight: "700" }}>{item.assetName}</Text>
-          <Text style={{ color: "#6b7280" }}>{item.assetCode}</Text>
+          <Text style={{ color: "#6b7280" }}> Location: {item.assetLocation.locationCode} - {item.assetLocation.locationName}</Text>
+          <Text style={{ color: "#6b7280" }}>Code: {item.assetCode}</Text>
           <Text style={{ marginTop: 4 }}>
             {item.underMaintenance ? "Under Maintenance" : "Operational"}
           </Text>
