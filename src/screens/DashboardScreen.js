@@ -95,89 +95,232 @@ export default function DashboardScreen({ navigation }) {
   const show = (v) => (v === null || v === undefined ? "—" : String(v));
 
   return (
-    <View style={{ flex: 1 }}>
-      {/* content */}
-      <View style={{ padding: 16 }}>
-        <Text style={{ fontSize: 20, fontWeight: "700", marginBottom: 4 }}>
-          Dashboard
-        </Text>
-        <Text style={{ color: "#6b7280", marginBottom: 12 }}>
-          Role: {roleRaw || "—"}
-        </Text>
-
-        {loading ? (
-          <ActivityIndicator />
-        ) : (
-          <View style={{ marginBottom: 16 }}>
-            <Text>Total Assets: {show(stats.totalAssets)}</Text>
-            <Text>Under Maintenance: {show(stats.underMaintenance)}</Text>
-            {/* चाहें तो ये भी दिखाएँ: */}
-            {/* <Text>Working: {show(stats.working)}</Text>
-            <Text>Not Working: {show(stats.notWorking)}</Text>
-            <Text>Special Assets: {show(stats.special)}</Text> */}
-          </View>
-        )}
-
-        <TouchableOpacity
-          style={styles.btn}
-          onPress={() => navigation.navigate("Assets")}
-        >
-          <Text style={styles.btnText}>Go to Assets</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={styles.btnOutline}
-          onPress={() => navigation.navigate("MaintenanceRequests")}
-        >
-          <Text style={styles.btnOutlineText}>Maintenance Requests</Text>
-        </TouchableOpacity>
+    <View style={styles.container}>
+      <View style={styles.header}>
+        <Text style={styles.title}>Dashboard</Text>
+        <Text style={styles.rolePill}>Role: {roleRaw || "—"}</Text>
       </View>
 
-      {/* QR FAB — केवल production */}
-      {isProduction && (
-        <TouchableOpacity
-          activeOpacity={0.9}
-          onPress={() => navigation.navigate("QRScan")}
-          style={styles.fab}
-        >
-          <MaterialCommunityIcons name="qrcode-scan" size={26} color="#fff" />
-        </TouchableOpacity>
+      {loading ? (
+        <ActivityIndicator />
+      ) : (
+        <View style={styles.grid}>
+          <View style={[styles.statCard, styles.cardPrimary]}>
+            <View style={[styles.iconCircle, styles.iconPrimary]}>
+              <MaterialCommunityIcons
+                name="warehouse"
+                size={18}
+                color="#1d4ed8"
+              />
+            </View>
+            <Text style={styles.statLabel}>Total Assets</Text>
+            <Text style={styles.statValue}>{show(stats.totalAssets)}</Text>
+          </View>
+
+          <View style={[styles.statCard, styles.cardAmber]}>
+            <View style={[styles.iconCircle, styles.iconAmber]}>
+              <MaterialCommunityIcons
+                name="wrench-outline"
+                size={18}
+                color="#b45309"
+              />
+            </View>
+            <Text style={styles.statLabel}>Under Maintenance</Text>
+            <Text style={styles.statValue}>{show(stats.underMaintenance)}</Text>
+          </View>
+
+          {/* Uncomment if you want to show these too */}
+          {/* <View style={[styles.statCard, styles.cardSuccess]}>
+        <View style={[styles.iconCircle, styles.iconSuccess]}>
+          <MaterialCommunityIcons name="check-circle-outline" size={18} color="#15803d" />
+        </View>
+        <Text style={styles.statLabel}>Working</Text>
+        <Text style={styles.statValue}>{show(stats.working)}</Text>
+      </View>
+
+      <View style={[styles.statCard, styles.cardDanger]}>
+        <View style={[styles.iconCircle, styles.iconDanger]}>
+          <MaterialCommunityIcons name="alert-octagon-outline" size={18} color="#b91c1c" />
+        </View>
+        <Text style={styles.statLabel}>Not Working</Text>
+        <Text style={styles.statValue}>{show(stats.notWorking)}</Text>
+      </View>
+
+      <View style={[styles.statCard, styles.cardIndigo]}>
+        <View style={[styles.iconCircle, styles.iconIndigo]}>
+          <MaterialCommunityIcons name="star-outline" size={18} color="#4338ca" />
+        </View>
+        <Text style={styles.statLabel}>Special Assets</Text>
+        <Text style={styles.statValue}>{show(stats.special)}</Text>
+      </View> */}
+        </View>
       )}
+
+      <TouchableOpacity
+        style={styles.btn}
+        onPress={() => navigation.navigate("Assets")}
+      >
+        <Text style={styles.btnText}>Go to Assets</Text>
+      </TouchableOpacity>
+
+      <TouchableOpacity
+        style={styles.btnOutline}
+        onPress={() => navigation.navigate("MaintenanceRequests")}
+      >
+        <Text style={styles.btnOutlineText}>Maintenance Requests</Text>
+      </TouchableOpacity>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  btn: {
-    backgroundColor: "#111827",
-    padding: 14,
-    borderRadius: 10,
-    alignItems: "center",
-    marginBottom: 8,
+  // Screen
+  container: {
+    flex: 1,
+    padding: 16,
+    backgroundColor: "#f8fafc", // slate-50
   },
-  btnText: { color: "#fff", fontWeight: "700" },
-  btnOutline: {
+
+  // Header
+  header: {
+    marginBottom: 12,
+  },
+  title: {
+    fontSize: 24,
+    fontWeight: "800",
+    color: "#0f172a", // slate-900
+    marginBottom: 6,
+    letterSpacing: 0.2,
+  },
+  rolePill: {
+    alignSelf: "flex-start",
+    backgroundColor: "#eef2ff", // indigo-50
+    color: "#3730a3", // indigo-700
+    borderColor: "#c7d2fe", // indigo-200
     borderWidth: 1,
-    borderColor: "#111827",
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: 999,
+    fontSize: 12,
+    fontWeight: "700",
+  },
+
+  // Stat grid
+  grid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "space-between",
+    marginBottom: 16,
+  },
+  statCard: {
+    width: "48%",
+    backgroundColor: "#fff",
+    borderRadius: 16,
     padding: 14,
-    borderRadius: 10,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: "#e5e7eb", // gray-200
+    // iOS shadow
+    shadowColor: "#000",
+    shadowOpacity: 0.06,
+    shadowOffset: { width: 0, height: 2 },
+    shadowRadius: 8,
+    // Android
+    elevation: 2,
+  },
+  statLabel: {
+    color: "#6b7280", // gray-500
+    fontSize: 12,
+    fontWeight: "700",
+    textTransform: "uppercase",
+    letterSpacing: 0.6,
+    marginTop: 2,
+  },
+  statValue: {
+    color: "#0f172a", // slate-900
+    fontSize: 22,
+    fontWeight: "800",
+    marginTop: 6,
+  },
+
+  // Icon bubble
+  iconCircle: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 6,
+    borderWidth: 1,
+  },
+
+  // Color accents (soft backgrounds + bolder borders)
+  cardPrimary: { backgroundColor: "#eff6ff", borderColor: "#bfdbfe" }, // blue
+  iconPrimary: { backgroundColor: "#dbeafe", borderColor: "#bfdbfe" },
+
+  cardAmber: { backgroundColor: "#fffbeb", borderColor: "#fde68a" }, // amber
+  iconAmber: { backgroundColor: "#fef3c7", borderColor: "#fde68a" },
+
+  cardSuccess: { backgroundColor: "#ecfdf5", borderColor: "#a7f3d0" }, // emerald
+  iconSuccess: { backgroundColor: "#d1fae5", borderColor: "#a7f3d0" },
+
+  cardDanger: { backgroundColor: "#fef2f2", borderColor: "#fecaca" }, // red
+  iconDanger: { backgroundColor: "#fee2e2", borderColor: "#fecaca" },
+
+  cardIndigo: { backgroundColor: "#eef2ff", borderColor: "#c7d2fe" }, // indigo
+  iconIndigo: { backgroundColor: "#e0e7ff", borderColor: "#c7d2fe" },
+
+  // Buttons
+  btn: {
+    backgroundColor: "#111827", // gray-900
+    paddingVertical: 14,
+    borderRadius: 12,
+    alignItems: "center",
+    marginBottom: 10,
+    // nicer shadow
+    shadowColor: "#000",
+    shadowOpacity: 0.12,
+    shadowOffset: { width: 0, height: 6 },
+    shadowRadius: 10,
+    elevation: 3,
+  },
+  btnText: {
+    color: "#fff",
+    fontWeight: "800",
+    letterSpacing: 0.3,
+    fontSize: 15,
+  },
+
+  btnOutline: {
+    borderWidth: 1.2,
+    borderColor: "#111827",
+    paddingVertical: 14,
+    borderRadius: 12,
     alignItems: "center",
   },
-  btnOutlineText: { color: "#111827", fontWeight: "700" },
+  btnOutlineText: {
+    color: "#111827",
+    fontWeight: "800",
+    letterSpacing: 0.3,
+    fontSize: 15,
+  },
+
+  // FAB
   fab: {
     position: "absolute",
     right: 20,
     bottom: 28,
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: "#2563eb",
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: "#2563eb", // blue-600
     justifyContent: "center",
     alignItems: "center",
-    elevation: 6,
+    elevation: 8,
     shadowColor: "#000",
     shadowOpacity: 0.25,
-    shadowOffset: { width: 0, height: 2 },
-    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 6 },
+    shadowRadius: 10,
   },
 });
+
