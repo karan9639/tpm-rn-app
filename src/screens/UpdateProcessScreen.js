@@ -6,83 +6,17 @@ import {
   ActivityIndicator,
   TouchableOpacity,
   Alert,
-  Modal,
   TextInput,
   ScrollView,
   StyleSheet,
 } from "react-native";
 import * as api from "../services/api";
+import { maintenanceAPI as MAINT_MAYBE } from "../services/api";
 import { Feather } from "@expo/vector-icons";
-
-function SparePartsModal({ visible, onClose, onAdd }) {
-  const [name, setName] = useState("");
-  const [qty, setQty] = useState("1");
-  const [id, setId] = useState("");
-
-  const add = () => {
-    if (!name.trim()) {
-      Alert.alert("Validation", "Enter spare part name.");
-      return;
-    }
-    const usedQuantity = Math.max(1, parseInt(qty || "1", 10));
-    onAdd([
-      { name: name.trim(), usedQuantity, assetSpareId: id.trim() || null },
-    ]);
-    setName("");
-    setQty("1");
-    setId("");
-  };
-
-  return (
-    <Modal visible={visible} animationType="slide" transparent>
-      <View style={styles.modalBackdrop}>
-        <View style={styles.modalCard}>
-          <Text style={{ fontWeight: "700", fontSize: 16, marginBottom: 8 }}>
-            Add Spare
-          </Text>
-          <TextInput
-            style={styles.input}
-            placeholder="Spare name *"
-            value={name}
-            onChangeText={setName}
-          />
-          <TextInput
-            style={styles.input}
-            placeholder="Optional Spare ID (assetSpareId)"
-            value={id}
-            onChangeText={setId}
-          />
-          <TextInput
-            style={styles.input}
-            placeholder="Qty"
-            keyboardType="number-pad"
-            value={qty}
-            onChangeText={setQty}
-          />
-
-          <View style={{ flexDirection: "row", gap: 8, marginTop: 4 }}>
-            <TouchableOpacity
-              style={[styles.btn, { backgroundColor: "#2563EB" }]}
-              onPress={add}
-            >
-              <Text style={styles.btnText}>Add</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.btn} onPress={onClose}>
-              <Text style={styles.btnText}>Close</Text>
-            </TouchableOpacity>
-          </View>
-          <Text style={{ color: "#6B7280", fontSize: 12, marginTop: 8 }}>
-            Tip: If you know the backend spare ID, add it so it can be linked.
-            Otherwise leave it blank.
-          </Text>
-        </View>
-      </View>
-    </Modal>
-  );
-}
+import SparePartsModal from "../components/SparePartsModal.native";
 
 export default function UpdateProcessScreen({ route, navigation }) {
-  const requestFromNav = route?.params?.request || null; // pass this from list screen
+  const requestFromNav = route?.params?.request || null;
   const requestId = route?.params?.requestId || requestFromNav?._id;
 
   const [request, setRequest] = useState(null);
@@ -104,16 +38,12 @@ export default function UpdateProcessScreen({ route, navigation }) {
     navigation?.setOptions?.({ title: "Update Process" });
   }, [navigation]);
 
-  // —— Load request details (mirrors your web behavior) ——
   useEffect(() => {
     const load = async () => {
       try {
         setLoading(true);
-        // Prefer the request passed via navigation (like the web stores in sessionStorage).
         const r = requestFromNav;
         if (!r) {
-          // If you have a detail endpoint, you could fetch by requestId here.
-          // For now we rely on the passed object to keep parity with the web code.
           throw new Error(
             "Request details not found. Open this screen from the list."
           );
@@ -185,7 +115,6 @@ export default function UpdateProcessScreen({ route, navigation }) {
     Alert.alert("Added", `Added ${normalized.length} spare part(s).`);
   };
 
-  // —— Validation like the web page ——
   const validate = () => {
     if (!formData.status) {
       Alert.alert("Validation", "Please select a status.");
@@ -236,8 +165,20 @@ export default function UpdateProcessScreen({ route, navigation }) {
         );
       }
 
-      // Web uses maintenanceAPI.sendAcknowledgement
-      await api.send_acknowledgement(payload);
+      // Use the same naming as web with safe fallbacks.
+      const sendAckFn =
+        MAINT_MAYBE?.sendAcknowledgement ||
+        api?.maintenanceAPI?.sendAcknowledgement ||
+        api?.sendAcknowledgement ||
+        api?.send_acknowledgement;
+
+      if (!sendAckFn) {
+        throw new Error(
+          "sendAcknowledgement API not found in services/api (export it like on web)."
+        );
+      }
+
+      await sendAckFn(payload);
 
       Alert.alert("Success", "Maintenance process updated successfully!", [
         {
@@ -549,26 +490,5 @@ const styles = StyleSheet.create({
     alignItems: "center",
     flexDirection: "row",
     justifyContent: "center",
-  },
-  btn: {
-    backgroundColor: "#111827",
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 10,
-    alignItems: "center",
-  },
-  btnText: { color: "#fff", fontWeight: "700" },
-  modalBackdrop: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.35)",
-    alignItems: "center",
-    justifyContent: "center",
-    padding: 16,
-  },
-  modalCard: {
-    width: "100%",
-    backgroundColor: "#fff",
-    borderRadius: 12,
-    padding: 14,
   },
 });
