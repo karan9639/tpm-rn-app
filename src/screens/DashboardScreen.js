@@ -15,12 +15,10 @@ import { MaterialCommunityIcons, Feather } from "@expo/vector-icons";
 import { BarCodeScanner } from "expo-barcode-scanner";
 
 export default function DashboardScreen({ navigation }) {
-  const [stats, setStats] = useState({
-    totalAssets: null,
-    underMaintenance: null,
-    working: null,
-    notWorking: null,
-    special: null,
+  const [counts, setCounts] = useState({
+    totalAssets: 0,
+    breakdownMaintenance: 0,
+    underMaintenance: 0,
   });
   const [loading, setLoading] = useState(true);
 
@@ -35,7 +33,6 @@ export default function DashboardScreen({ navigation }) {
     .toLowerCase();
   const isProduction = roleRaw.includes("production");
 
-  // headerRight -> Logout
   useLayoutEffect(() => {
     navigation.setOptions({
       headerRight: () => (
@@ -48,7 +45,6 @@ export default function DashboardScreen({ navigation }) {
         </TouchableOpacity>
       ),
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [navigation]);
 
   const confirmLogout = () => {
@@ -68,32 +64,35 @@ export default function DashboardScreen({ navigation }) {
     ]);
   };
 
+  // ---- counts
   useEffect(() => {
     (async () => {
       try {
-        const env = await api.get_asset_counting();
-        const block = Array.isArray(env?.data) ? env.data[0] : env?.data || {};
+        let resp =
+          (api.assetAPI?.getAssetCounting &&
+            (await api.assetAPI.getAssetCounting())) ||
+          (await api.get_asset_counting());
 
-        const totalAssets = block?.totalAssets?.[0]?.count ?? 0;
-        const underMaintenance = block?.underMaintenance?.[0]?.total ?? 0;
+        const arr =
+          (Array.isArray(resp?.data) && resp?.data) ||
+          (Array.isArray(resp?.data?.data) && resp?.data?.data) ||
+          (Array.isArray(resp) && resp) ||
+          [];
 
-        const findByStatus = (label) =>
-          (block?.byStatus || []).find((x) => (x?._id || x?.id) === label)
-            ?.total ?? 0;
+        const data = arr[0] || {};
 
-        const working = findByStatus("Working");
-        const notWorking = findByStatus("Not Working");
-        const special = block?.specialAssets?.[0]?.total ?? 0;
+        const totalAssets = data?.totalAssets?.[0]?.count || 0;
 
-        setStats({
-          totalAssets,
-          underMaintenance,
-          working,
-          notWorking,
-          special,
-        });
-      } catch (e) {
-        console.log("dashboard stats error:", e?.message || e);
+        const breakdownMaintenance =
+          data.byStatus?.find((s) => (s?._id ?? s?.id) === "Not Working")
+            ?.total || 0;
+
+        const underMaintenance =
+          data.underMaintenance?.find((it) => it?._id === true)?.total || 0;
+
+        setCounts({ totalAssets, breakdownMaintenance, underMaintenance });
+      } catch (error) {
+        console.log("[Dashboard] get counts error:", error?.message || error);
       } finally {
         setLoading(false);
       }
@@ -106,25 +105,70 @@ export default function DashboardScreen({ navigation }) {
     (async () => {
       const { status } = await BarCodeScanner.requestPermissionsAsync();
       setHasPermission(status === "granted");
+      setScanned(false);
     })();
   }, [scannerOpen]);
 
-  const show = (v) => (v === null || v === undefined ? "—" : String(v));
+  const cards = [
+    {
+      title: "Hi, Jasmine Knitting 👋",
+      subtitle: "Time to check in!",
+      description: "Please punch in.",
+      iconName: "power",
+      iconColor: "#fff",
+      iconBg: "#22c55e",
+      bgColor: "#eff6ff",
+      borderColor: "#bfdbfe",
+    },
+    {
+      title: `Total Assets - ${loading ? "..." : counts.totalAssets}`,
+      description: `You have ${loading ? "..." : counts.totalAssets} assets.`,
+      iconName: "warehouse",
+      iconColor: "#1d4ed8",
+      iconBg: "#ffffff",
+      bgColor: "#eef2ff",
+      borderColor: "#c7d2fe",
+    },
+    {
+      title: `Breakdown Maintenance - ${
+        loading ? "..." : counts.breakdownMaintenance
+      }`,
+      description: `You have ${
+        loading ? "..." : counts.breakdownMaintenance
+      } Breakdowns Left.`,
+      iconName: "alert-octagon-outline",
+      iconColor: "#f59e0b",
+      iconBg: "#ffffff",
+      bgColor: "#fff7ed",
+      borderColor: "#fed7aa",
+    },
+    {
+      title: `Under Maintenance - ${loading ? "..." : counts.underMaintenance}`,
+      description: `Currently ${
+        loading ? "..." : counts.underMaintenance
+      } asset(s) under maintenance.`,
+      iconName: "wrench-outline",
+      iconColor: "#b45309",
+      iconBg: "#ffffff",
+      bgColor: "#fffbeb",
+      borderColor: "#fde68a",
+    },
+  ];
 
   const handleBarCodeScanned = ({ type, data }) => {
     if (scanned) return;
     setScanned(true);
-    setScannerOpen(false);
-
-    // TODO: adjust destination if needed (e.g., "AssetDetails")
-    // Pass the scanned data along for your next screen to handle.
+    setTimeout(() => setScannerOpen(false), 50);
     navigation.navigate("Assets", {
       scannedCode: data,
       scannedType: type,
     });
+  };
 
-    // If you want a quick visual confirmation:
-    // Alert.alert("Scanned", `Type: ${type}\nData: ${data}`);
+  const openScanner = () => {
+    setHasPermission(null);
+    setScanned(false);
+    setScannerOpen(true);
   };
 
   return (
@@ -135,63 +179,39 @@ export default function DashboardScreen({ navigation }) {
         <Text style={styles.rolePill}>Role: {roleRaw || "—"}</Text>
       </View>
 
-      {loading ? (
-        <ActivityIndicator />
-      ) : (
-        <View style={styles.grid}>
-          <View style={[styles.statCard, styles.cardPrimary]}>
-            <View style={[styles.iconCircle, styles.iconPrimary]}>
-              <MaterialCommunityIcons
-                name="warehouse"
-                size={18}
-                color="#1d4ed8"
-              />
+      {/* Cards */}
+      <View style={{ gap: 12 }}>
+        {cards.map((c, idx) => (
+          <View
+            key={idx}
+            style={[
+              styles.card,
+              { backgroundColor: c.bgColor, borderColor: c.borderColor },
+            ]}
+          >
+            <View style={styles.cardRow}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.cardTitle}>{c.title}</Text>
+                {c.subtitle ? (
+                  <Text style={styles.cardSubtitle}>{c.subtitle}</Text>
+                ) : null}
+                <Text style={styles.cardDesc}>{c.description}</Text>
+              </View>
+              <View
+                style={[styles.iconCircleBig, { backgroundColor: c.iconBg }]}
+              >
+                <MaterialCommunityIcons
+                  name={c.iconName}
+                  size={28}
+                  color={c.iconColor}
+                />
+              </View>
             </View>
-            <Text style={styles.statLabel}>Total Assets</Text>
-            <Text style={styles.statValue}>{show(stats.totalAssets)}</Text>
           </View>
+        ))}
+      </View>
 
-          <View style={[styles.statCard, styles.cardAmber]}>
-            <View style={[styles.iconCircle, styles.iconAmber]}>
-              <MaterialCommunityIcons
-                name="wrench-outline"
-                size={18}
-                color="#b45309"
-              />
-            </View>
-            <Text style={styles.statLabel}>Under Maintenance</Text>
-            <Text style={styles.statValue}>{show(stats.underMaintenance)}</Text>
-          </View>
-
-          {/*
-          // Uncomment these if you'd like to show more cards
-          <View style={[styles.statCard, styles.cardSuccess]}>
-            <View style={[styles.iconCircle, styles.iconSuccess]}>
-              <MaterialCommunityIcons name="check-circle-outline" size={18} color="#15803d" />
-            </View>
-            <Text style={styles.statLabel}>Working</Text>
-            <Text style={styles.statValue}>{show(stats.working)}</Text>
-          </View>
-
-          <View style={[styles.statCard, styles.cardDanger]}>
-            <View style={[styles.iconCircle, styles.iconDanger]}>
-              <MaterialCommunityIcons name="alert-octagon-outline" size={18} color="#b91c1c" />
-            </View>
-            <Text style={styles.statLabel}>Not Working</Text>
-            <Text style={styles.statValue}>{show(stats.notWorking)}</Text>
-          </View>
-
-          <View style={[styles.statCard, styles.cardIndigo]}>
-            <View style={[styles.iconCircle, styles.iconIndigo]}>
-              <MaterialCommunityIcons name="star-outline" size={18} color="#4338ca" />
-            </View>
-            <Text style={styles.statLabel}>Special Assets</Text>
-            <Text style={styles.statValue}>{show(stats.special)}</Text>
-          </View>
-          */}
-        </View>
-      )}
-
+      {/* Actions */}
       <TouchableOpacity
         style={styles.btn}
         onPress={() => navigation.navigate("Assets")}
@@ -210,10 +230,7 @@ export default function DashboardScreen({ navigation }) {
       {isProduction && (
         <TouchableOpacity
           activeOpacity={0.9}
-          onPress={() => {
-            setScanned(false);
-            setScannerOpen(true);
-          }}
+          onPress={openScanner}
           style={styles.fab}
         >
           <MaterialCommunityIcons name="qrcode-scan" size={26} color="#fff" />
@@ -227,7 +244,6 @@ export default function DashboardScreen({ navigation }) {
         onRequestClose={() => setScannerOpen(false)}
       >
         <View style={styles.scannerContainer}>
-          {/* Top bar */}
           <View style={styles.scannerTopBar}>
             <Text style={styles.scannerTitle}>Scan QR Code</Text>
             <TouchableOpacity
@@ -273,7 +289,6 @@ export default function DashboardScreen({ navigation }) {
                 onBarCodeScanned={scanned ? undefined : handleBarCodeScanned}
                 style={StyleSheet.absoluteFillObject}
               />
-              {/* Optional "scan again" when paused */}
               {scanned && (
                 <TouchableOpacity
                   style={styles.scanAgainBtn}
@@ -292,11 +307,7 @@ export default function DashboardScreen({ navigation }) {
 
 const styles = StyleSheet.create({
   // Screen
-  container: {
-    flex: 1,
-    padding: 16,
-    backgroundColor: "#f8fafc", // slate-50
-  },
+  container: { flex: 1, padding: 16, backgroundColor: "#f8fafc" },
 
   // Header
   header: { marginBottom: 12 },
@@ -320,68 +331,29 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
 
-  // Stat grid
-  grid: {
+  // Card
+  card: { borderRadius: 16, padding: 14, borderWidth: 1 },
+  cardRow: {
     flexDirection: "row",
-    flexWrap: "wrap",
+    alignItems: "center",
     justifyContent: "space-between",
-    marginBottom: 16,
   },
-  statCard: {
-    width: "48%",
-    backgroundColor: "#fff",
-    borderRadius: 16,
-    padding: 14,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: "#e5e7eb",
-    shadowColor: "#000",
-    shadowOpacity: 0.06,
-    shadowOffset: { width: 0, height: 2 },
-    shadowRadius: 8,
-    elevation: 2,
-  },
-  statLabel: {
-    color: "#6b7280",
-    fontSize: 12,
-    fontWeight: "700",
-    textTransform: "uppercase",
-    letterSpacing: 0.6,
-    marginTop: 2,
-  },
-  statValue: {
-    color: "#0f172a",
-    fontSize: 22,
+  cardTitle: {
+    fontSize: 16,
     fontWeight: "800",
-    marginTop: 6,
+    color: "#0f172a",
+    marginBottom: 4,
   },
-
-  // Icon bubble
-  iconCircle: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
+  cardSubtitle: { color: "#6b7280", marginBottom: 4, fontWeight: "700" },
+  cardDesc: { color: "#6b7280" },
+  iconCircleBig: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     alignItems: "center",
     justifyContent: "center",
-    marginBottom: 6,
-    borderWidth: 1,
+    marginLeft: 12,
   },
-
-  // Color accents
-  cardPrimary: { backgroundColor: "#eff6ff", borderColor: "#bfdbfe" },
-  iconPrimary: { backgroundColor: "#dbeafe", borderColor: "#bfdbfe" },
-
-  cardAmber: { backgroundColor: "#fffbeb", borderColor: "#fde68a" },
-  iconAmber: { backgroundColor: "#fef3c7", borderColor: "#fde68a" },
-
-  cardSuccess: { backgroundColor: "#ecfdf5", borderColor: "#a7f3d0" },
-  iconSuccess: { backgroundColor: "#d1fae5", borderColor: "#a7f3d0" },
-
-  cardDanger: { backgroundColor: "#fef2f2", borderColor: "#fecaca" },
-  iconDanger: { backgroundColor: "#fee2e2", borderColor: "#fecaca" },
-
-  cardIndigo: { backgroundColor: "#eef2ff", borderColor: "#c7d2fe" },
-  iconIndigo: { backgroundColor: "#e0e7ff", borderColor: "#c7d2fe" },
 
   // Buttons
   btn: {
@@ -389,6 +361,7 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     borderRadius: 12,
     alignItems: "center",
+    marginTop: 16,
     marginBottom: 10,
     shadowColor: "#000",
     shadowOpacity: 0.12,
@@ -435,10 +408,7 @@ const styles = StyleSheet.create({
   },
 
   // Scanner modal
-  scannerContainer: {
-    flex: 1,
-    backgroundColor: "#000",
-  },
+  scannerContainer: { flex: 1, backgroundColor: "#000" },
   scannerTopBar: {
     position: "absolute",
     top: 0,
@@ -453,14 +423,8 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     zIndex: 2,
   },
-  scannerTitle: {
-    color: "#fff",
-    fontWeight: "800",
-    fontSize: 16,
-  },
-  closeBtn: {
-    padding: 6,
-  },
+  scannerTitle: { color: "#fff", fontWeight: "800", fontSize: 16 },
+  closeBtn: { padding: 6 },
   scannerCenter: {
     flex: 1,
     alignItems: "center",
