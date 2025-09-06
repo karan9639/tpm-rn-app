@@ -7,12 +7,10 @@ import {
   TouchableOpacity,
   StyleSheet,
   Alert,
-  Modal,
 } from "react-native";
 import * as api from "../services/api";
 import { useAuth } from "../context/AuthContext";
 import { MaterialCommunityIcons, Feather } from "@expo/vector-icons";
-import { BarCodeScanner } from "expo-barcode-scanner";
 
 export default function DashboardScreen({ navigation }) {
   const [counts, setCounts] = useState({
@@ -21,11 +19,6 @@ export default function DashboardScreen({ navigation }) {
     underMaintenance: 0,
   });
   const [loading, setLoading] = useState(true);
-
-  // QR state
-  const [scannerOpen, setScannerOpen] = useState(false);
-  const [hasPermission, setHasPermission] = useState(null); // null | boolean
-  const [scanned, setScanned] = useState(false);
 
   const { user, logout } = useAuth();
   const roleRaw = (user?.role ?? user?.accountType ?? user?.employeeType ?? "")
@@ -80,13 +73,10 @@ export default function DashboardScreen({ navigation }) {
           [];
 
         const data = arr[0] || {};
-
         const totalAssets = data?.totalAssets?.[0]?.count || 0;
-
         const breakdownMaintenance =
           data.byStatus?.find((s) => (s?._id ?? s?.id) === "Not Working")
             ?.total || 0;
-
         const underMaintenance =
           data.underMaintenance?.find((it) => it?._id === true)?.total || 0;
 
@@ -99,15 +89,14 @@ export default function DashboardScreen({ navigation }) {
     })();
   }, []);
 
-  // Ask camera permission when opening scanner
-  useEffect(() => {
-    if (!scannerOpen) return;
-    (async () => {
-      const { status } = await BarCodeScanner.requestPermissionsAsync();
-      setHasPermission(status === "granted");
-      setScanned(false);
-    })();
-  }, [scannerOpen]);
+  // Open the dedicated QR scanner screen (uses expo-camera there)
+  const openScanner = () => {
+    navigation.navigate("QRScan", {
+      allowScan: true,
+      // Optional: if you want to go somewhere else after scan, pass `next`
+      // next: { screen: "Assets", params: {} },
+    });
+  };
 
   const cards = [
     {
@@ -154,22 +143,6 @@ export default function DashboardScreen({ navigation }) {
       borderColor: "#fde68a",
     },
   ];
-
-  const handleBarCodeScanned = ({ type, data }) => {
-    if (scanned) return;
-    setScanned(true);
-    setTimeout(() => setScannerOpen(false), 50);
-    navigation.navigate("Assets", {
-      scannedCode: data,
-      scannedType: type,
-    });
-  };
-
-  const openScanner = () => {
-    setHasPermission(null);
-    setScanned(false);
-    setScannerOpen(true);
-  };
 
   return (
     <View style={styles.container}>
@@ -236,80 +209,13 @@ export default function DashboardScreen({ navigation }) {
           <MaterialCommunityIcons name="qrcode-scan" size={26} color="#fff" />
         </TouchableOpacity>
       )}
-
-      {/* QR Scanner Modal */}
-      <Modal
-        visible={scannerOpen}
-        animationType="slide"
-        onRequestClose={() => setScannerOpen(false)}
-      >
-        <View style={styles.scannerContainer}>
-          <View style={styles.scannerTopBar}>
-            <Text style={styles.scannerTitle}>Scan QR Code</Text>
-            <TouchableOpacity
-              onPress={() => {
-                setScannerOpen(false);
-                setScanned(false);
-              }}
-              style={styles.closeBtn}
-              accessibilityLabel="Close scanner"
-            >
-              <Feather name="x" size={22} color="#fff" />
-            </TouchableOpacity>
-          </View>
-
-          {hasPermission === null ? (
-            <View style={styles.scannerCenter}>
-              <ActivityIndicator color="#fff" />
-              <Text style={styles.scannerText}>
-                Requesting camera permission…
-              </Text>
-            </View>
-          ) : hasPermission === false ? (
-            <View style={styles.scannerCenter}>
-              <Text style={styles.scannerText}>
-                Camera permission not granted.
-              </Text>
-              <TouchableOpacity
-                onPress={async () => {
-                  const { status } =
-                    await BarCodeScanner.requestPermissionsAsync();
-                  setHasPermission(status === "granted");
-                }}
-                style={styles.reqPermBtn}
-              >
-                <Text style={{ color: "#111827", fontWeight: "800" }}>
-                  Allow Camera
-                </Text>
-              </TouchableOpacity>
-            </View>
-          ) : (
-            <>
-              <BarCodeScanner
-                onBarCodeScanned={scanned ? undefined : handleBarCodeScanned}
-                style={StyleSheet.absoluteFillObject}
-              />
-              {scanned && (
-                <TouchableOpacity
-                  style={styles.scanAgainBtn}
-                  onPress={() => setScanned(false)}
-                >
-                  <Text style={styles.scanAgainText}>Tap to Scan Again</Text>
-                </TouchableOpacity>
-              )}
-            </>
-          )}
-        </View>
-      </Modal>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  // Screen
   container: { flex: 1, padding: 16, backgroundColor: "#f8fafc" },
 
-  // Header
   header: { marginBottom: 12 },
   title: {
     fontSize: 24,
@@ -331,7 +237,6 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
 
-  // Card
   card: { borderRadius: 16, padding: 14, borderWidth: 1 },
   cardRow: {
     flexDirection: "row",
@@ -355,7 +260,6 @@ const styles = StyleSheet.create({
     marginLeft: 12,
   },
 
-  // Buttons
   btn: {
     backgroundColor: "#111827",
     paddingVertical: 14,
@@ -389,7 +293,6 @@ const styles = StyleSheet.create({
     fontSize: 15,
   },
 
-  // FAB
   fab: {
     position: "absolute",
     right: 20,
@@ -406,47 +309,4 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 6 },
     shadowRadius: 10,
   },
-
-  // Scanner modal
-  scannerContainer: { flex: 1, backgroundColor: "#000" },
-  scannerTopBar: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    paddingTop: 50,
-    paddingBottom: 12,
-    paddingHorizontal: 16,
-    backgroundColor: "rgba(0,0,0,0.35)",
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    zIndex: 2,
-  },
-  scannerTitle: { color: "#fff", fontWeight: "800", fontSize: 16 },
-  closeBtn: { padding: 6 },
-  scannerCenter: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: 16,
-  },
-  scannerText: { color: "#fff", marginTop: 12, textAlign: "center" },
-  reqPermBtn: {
-    marginTop: 12,
-    backgroundColor: "#f9fafb",
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 10,
-  },
-  scanAgainBtn: {
-    position: "absolute",
-    bottom: 40,
-    alignSelf: "center",
-    backgroundColor: "rgba(0,0,0,0.6)",
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 999,
-  },
-  scanAgainText: { color: "#fff", fontWeight: "800" },
 });

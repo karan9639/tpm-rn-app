@@ -1,35 +1,76 @@
-// src/screens/QRScanScreen.js
-import React, { useEffect, useState } from "react";
-import { View, Text, StyleSheet, ActivityIndicator } from "react-native";
-import { BarCodeScanner } from "expo-barcode-scanner";
+import React, { useCallback, useEffect, useRef, useState } from "react";
+import {
+  View,
+  Text,
+  ActivityIndicator,
+  TouchableOpacity,
+  StyleSheet,
+} from "react-native";
+import { CameraView, useCameraPermissions } from "expo-camera";
+import { useIsFocused } from "@react-navigation/native";
+import UnauthorizedScreen from "./UnauthorizedScreen";
 
-export default function QRScanScreen({ navigation }) {
-  const [hasPermission, setHasPermission] = useState(null);
-  const [scanned, setScanned] = useState(false);
+export default function QRScanScreen({ route, navigation }) {
+  // Open camera only if caller explicitly allowed it
+  const allowScan = route?.params?.allowScan === true;
+  const next = route?.params?.next; // { screen, params }
+
+  // HOOKS (must be declared before any return)
+  const isFocused = useIsFocused();
+  const [permission, requestPermission] = useCameraPermissions();
   const [ready, setReady] = useState(false);
+  const [scanned, setScanned] = useState(false);
+  const throttleRef = useRef(0);
 
+  const handleScanned = useCallback(
+    ({ data, type }) => {
+      if (scanned) return;
+
+      const now = Date.now();
+      if (now - throttleRef.current < 800) return; // throttle double fires
+      throttleRef.current = now;
+
+      setScanned(true);
+
+      if (next?.screen) {
+        navigation.replace(next.screen, {
+          ...(next.params || {}),
+          scannedData: data,
+          scannedType: type,
+        });
+      } else {
+        navigation.replace("QRDetails", { data, type });
+      }
+    },
+    [navigation, next, scanned]
+  );
+
+  // Ask permission when focused
   useEffect(() => {
-    let mounted = true;
+    let alive = true;
     (async () => {
-      const { status } = await BarCodeScanner.requestPermissionsAsync();
-      if (mounted) setHasPermission(status === "granted");
-      setReady(true);
+      setReady(false);
+      setScanned(false);
+
+      if (!isFocused) {
+        if (alive) setReady(true);
+        return;
+      }
+      if (!permission || permission.status === "undetermined") {
+        await requestPermission();
+      }
+      if (alive) setReady(true);
     })();
     return () => {
-      mounted = false;
+      alive = false;
     };
-  }, []);
+  }, [isFocused, permission?.status, requestPermission]);
 
-  const handleBarCodeScanned = ({ data }) => {
-    if (scanned) return;
-    setScanned(true);
+  // Gate — if caller didn’t allow, show Unauthorized
+  if (!allowScan) return <UnauthorizedScreen />;
 
-    // web में data को URL param में भेजते थे;
-    // यहां हम सीधे next स्क्रीन को data दे देंगे
-    navigation.replace("QRDetails", { data });
-  };
-
-  if (!ready) {
+  // Permission flow UIs
+  if (!ready || !permission) {
     return (
       <View style={styles.center}>
         <ActivityIndicator />
@@ -38,28 +79,43 @@ export default function QRScanScreen({ navigation }) {
     );
   }
 
-  if (hasPermission === false) {
+  if (!permission.granted) {
     return (
       <View style={styles.center}>
-        <Text style={styles.title}>Camera permission denied</Text>
+        <Text style={styles.title}>Camera permission required</Text>
         <Text style={styles.muted}>
-          Enable camera permission from settings.
+          Please allow access to use the scanner.
         </Text>
+        <TouchableOpacity onPress={requestPermission} style={styles.retryBtn}>
+          <Text style={styles.retryText}>Allow Camera</Text>
+        </TouchableOpacity>
       </View>
     );
   }
 
+  // Scanner
   return (
     <View style={styles.container}>
-      <BarCodeScanner
-        onBarCodeScanned={scanned ? undefined : handleBarCodeScanned}
-        style={StyleSheet.absoluteFillObject}
-        barCodeTypes={[BarCodeScanner.Constants.BarCodeType.qr]}
-      />
-      {/* Simple scan-frame overlay */}
+      {isFocused && (
+        <CameraView
+          style={styles.camera}
+          facing="back"
+          barcodeScannerSettings={{ barcodeTypes: ["qr"] }}
+          onBarcodeScanned={scanned ? undefined : handleScanned}
+        />
+      )}
+
+      {/* Overlay */}
       <View style={styles.overlay}>
-        <View style={styles.frame} />
+        <View style={styles.frame}>
+          <View style={styles.scanLine} />
+        </View>
         <Text style={styles.caption}>Point your camera at a QR code</Text>
+        {scanned && (
+          <Text style={[styles.caption, { marginTop: 8, opacity: 0.8 }]}>
+            Processing…
+          </Text>
+        )}
       </View>
     </View>
   );
@@ -67,29 +123,48 @@ export default function QRScanScreen({ navigation }) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#000" },
+  camera: { position: "absolute", top: 0, right: 0, bottom: 0, left: 0 },
   center: {
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
     padding: 16,
   },
-  title: { fontSize: 18, fontWeight: "700", marginBottom: 6 },
-  muted: { color: "#6b7280" },
+  title: { fontSize: 18, fontWeight: "700", marginBottom: 6, color: "#111827" },
+  muted: { color: "#6b7280", textAlign: "center" },
+  retryBtn: {
+    marginTop: 12,
+    backgroundColor: "#f3f4f6",
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 10,
+  },
+  retryText: { color: "#111827", fontWeight: "800" },
   overlay: {
-    ...StyleSheet.absoluteFillObject,
+    position: "absolute",
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
     alignItems: "center",
     justifyContent: "center",
   },
   frame: {
-    width: 250,
-    height: 250,
+    width: 260,
+    height: 260,
     borderRadius: 16,
     borderWidth: 3,
-    borderColor: "rgba(255,255,255,0.9)",
+    borderColor: "rgba(255,255,255,0.95)",
+    overflow: "hidden",
+    alignItems: "center",
+    justifyContent: "center",
   },
-  caption: {
-    marginTop: 16,
-    color: "#fff",
-    fontWeight: "600",
+  scanLine: {
+    position: "absolute",
+    top: 0,
+    width: "90%",
+    height: 2,
+    backgroundColor: "#22c55e",
   },
+  caption: { marginTop: 16, color: "#fff", fontWeight: "700" },
 });

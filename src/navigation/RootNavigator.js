@@ -1,10 +1,8 @@
-// src/navigation/RootNavigator.js
 import React from "react";
 import { ActivityIndicator, View } from "react-native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { useAuth } from "../context/AuthContext";
 
-// Screens
 import LoginScreen from "../screens/LoginScreen";
 import DashboardScreen from "../screens/DashboardScreen";
 import AssetScreen from "../screens/AssetScreen";
@@ -15,8 +13,6 @@ import UpdateProcessScreen from "../screens/UpdateProcessScreen";
 import AcknowledgementsScreen from "../screens/AcknowledgementsScreen";
 import UnauthorizedScreen from "../screens/UnauthorizedScreen";
 import RequestMaintenanceScreen from "../screens/RequestMaintenanceScreen";
-
-// QR screens
 import QRScanScreen from "../screens/QRScanScreen";
 import QRDetailsScreen from "../screens/QRDetailsScreen";
 
@@ -86,7 +82,6 @@ export default function RootNavigator() {
             component={RequestMaintenanceScreen}
             options={{ title: "Request Maintenance" }}
           />
-
           <Stack.Screen
             name="MaintenanceRequests"
             component={MaintenanceRequestsScreen}
@@ -117,10 +112,10 @@ export default function RootNavigator() {
             )}
           </Stack.Screen>
 
-          {/* QR routes -> production only */}
+          {/* QR routes -> mechanic + production */}
           <Stack.Screen name="QRScan" options={{ title: "Scan QR Code" }}>
             {(props) => (
-              <RoleBasedGuard allowedRoles={["production"]}>
+              <RoleBasedGuard allowedRoles={["mechanic", "production"]}>
                 <QRScanScreen {...props} />
               </RoleBasedGuard>
             )}
@@ -128,7 +123,7 @@ export default function RootNavigator() {
 
           <Stack.Screen name="QRDetails" options={{ title: "QR Details" }}>
             {(props) => (
-              <RoleBasedGuard allowedRoles={["production"]}>
+              <RoleBasedGuard allowedRoles={["mechanic", "production"]}>
                 <QRDetailsScreen {...props} />
               </RoleBasedGuard>
             )}

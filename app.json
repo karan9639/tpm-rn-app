@@ -1,0 +1,6 @@
+{
+  "expo": {
+    "ios": { "infoPlist": { "NSCameraUsageDescription": "Scan QR codes for assets." } },
+    "android": { "permissions": ["CAMERA"] }
+  }
+}

@@ -1,4 +1,3 @@
-// src/screens/QRDetailsScreen.js
 import React from "react";
 import {
   View,
@@ -10,48 +9,31 @@ import {
 } from "react-native";
 
 export default function QRDetailsScreen({ route, navigation }) {
-  const raw = route?.params?.data || "";
+  const raw = route?.params?.data ?? route?.params?.scannedData ?? "";
 
   let assetDetails = null;
   try {
-    // web की तरह decodeURIComponent → JSON.parse
     assetDetails = JSON.parse(decodeURIComponent(raw));
   } catch {
     try {
       assetDetails = JSON.parse(raw);
     } catch {
-      /* ignore */
+      assetDetails = null;
     }
   }
 
   if (!assetDetails) {
     return (
-      <View
-        style={{
-          flex: 1,
-          alignItems: "center",
-          justifyContent: "center",
-          padding: 16,
-        }}
-      >
-        <Text style={{ fontSize: 18, fontWeight: "700", marginBottom: 4 }}>
-          Invalid QR Code
-        </Text>
-        <Text style={{ color: "#6b7280", textAlign: "center" }}>
+      <View style={styles.invalidWrap}>
+        <Text style={styles.invalidTitle}>Invalid QR Code</Text>
+        <Text style={styles.invalidText}>
           The scanned QR code data is not valid.
         </Text>
         <TouchableOpacity
           onPress={() => navigation.navigate("Dashboard")}
-          style={{
-            marginTop: 12,
-            backgroundColor: "#2563eb",
-            padding: 12,
-            borderRadius: 10,
-          }}
+          style={styles.invalidBtn}
         >
-          <Text style={{ color: "#fff", fontWeight: "700" }}>
-            Back to Dashboard
-          </Text>
+          <Text style={styles.invalidBtnText}>Back to Dashboard</Text>
         </TouchableOpacity>
       </View>
     );
@@ -67,7 +49,7 @@ export default function QRDetailsScreen({ route, navigation }) {
     return { bg: "#f3f4f6", color: "#374151" };
   };
 
-  const basic = [
+  const basicDetails = [
     { label: "Asset Code", value: assetDetails.code },
     { label: "Model", value: assetDetails.model },
     { label: "Category", value: assetDetails.category },
@@ -75,7 +57,8 @@ export default function QRDetailsScreen({ route, navigation }) {
     { label: "Location", value: assetDetails.location },
     { label: "Price", value: assetDetails.price },
   ];
-  const additional = [
+
+  const additionalDetails = [
     { label: "Supplier", value: assetDetails.supplier },
     { label: "Purchase Date", value: assetDetails.purchaseDate },
     { label: "Last Maintenance", value: assetDetails.lastMaintenance },
@@ -85,131 +68,66 @@ export default function QRDetailsScreen({ route, navigation }) {
   const statusStyle = getStatusClass(assetDetails.status);
 
   return (
-    <ScrollView contentContainerStyle={{ padding: 16, gap: 16 }}>
+    <ScrollView contentContainerStyle={styles.scrollContent}>
       <TouchableOpacity onPress={() => navigation.goBack()}>
-        <Text style={{ color: "#2563eb", fontWeight: "700" }}>‹ Back</Text>
+        <Text style={styles.backLink}>‹ Back</Text>
       </TouchableOpacity>
 
-      <View
-        style={{
-          backgroundColor: "#fff",
-          borderRadius: 16,
-          overflow: "hidden",
-          elevation: 2,
-        }}
-      >
-        <View
-          style={{
-            width: "100%",
-            aspectRatio: 16 / 9,
-            backgroundColor: "#e5e7eb",
-            alignItems: "center",
-            justifyContent: "center",
-          }}
-        >
+      <View style={styles.card}>
+        <View style={styles.heroImageWrap}>
           <Image
             source={{
               uri: "https://dummyimage.com/600x338/edf2f7/2d3748&text=Asset+Image",
             }}
-            style={{ width: "100%", height: "100%" }}
+            style={styles.heroImage}
             resizeMode="cover"
           />
         </View>
 
-        <View style={{ padding: 16 }}>
-          <Text style={{ fontSize: 20, fontWeight: "700", marginBottom: 8 }}>
+        <View style={styles.content}>
+          <Text style={styles.title}>
             {assetDetails.assetId} - {assetDetails.name}
           </Text>
+
           <View
-            style={{
-              alignSelf: "flex-start",
-              paddingHorizontal: 10,
-              paddingVertical: 4,
-              borderRadius: 9999,
-              backgroundColor: statusStyle.bg,
-            }}
+            style={[styles.statusPill, { backgroundColor: statusStyle.bg }]}
           >
-            <Text style={{ color: statusStyle.color, fontWeight: "700" }}>
-              {assetDetails.status}
+            <Text style={[styles.statusText, { color: statusStyle.color }]}>
+              {assetDetails.status || "Unknown"}
             </Text>
           </View>
 
-          {/* Basic details */}
-          <View style={{ marginTop: 16 }}>
-            {basic.map((it) => (
-              <View
-                key={it.label}
-                style={{
-                  flexDirection: "row",
-                  justifyContent: "space-between",
-                  paddingVertical: 8,
-                  borderBottomWidth: 1,
-                  borderBottomColor: "#f3f4f6",
-                }}
-              >
-                <Text style={{ color: "#6b7280" }}>{it.label}</Text>
-                <Text style={{ fontWeight: "700" }}>{it.value || "N/A"}</Text>
+          <View style={styles.section}>
+            {basicDetails.map((it) => (
+              <View key={it.label} style={styles.detailRow}>
+                <Text style={styles.rowLabel}>{it.label}</Text>
+                <Text style={styles.rowValue}>{it.value || "N/A"}</Text>
               </View>
             ))}
           </View>
 
-          {/* Additional */}
-          <View
-            style={{
-              backgroundColor: "#f9fafb",
-              borderRadius: 12,
-              padding: 12,
-              marginTop: 16,
-            }}
-          >
-            <Text style={{ fontWeight: "700", marginBottom: 8 }}>
-              Additional Information
-            </Text>
-            {additional.map((it) => (
-              <View
-                key={it.label}
-                style={{
-                  flexDirection: "row",
-                  justifyContent: "space-between",
-                  paddingVertical: 4,
-                }}
-              >
-                <Text style={{ color: "#6b7280" }}>{it.label}:</Text>
-                <Text style={{ fontWeight: "700" }}>{it.value || "N/A"}</Text>
+          <View style={styles.additionalBox}>
+            <Text style={styles.additionalTitle}>Additional Information</Text>
+            {additionalDetails.map((it) => (
+              <View key={it.label} style={styles.additionalRow}>
+                <Text style={styles.additionalLabel}>{it.label}:</Text>
+                <Text style={styles.additionalValue}>{it.value || "N/A"}</Text>
               </View>
             ))}
           </View>
 
-          {/* Actions (optional: same as web) */}
-          <View style={{ flexDirection: "row", gap: 10, marginTop: 16 }}>
+          <View style={styles.actionsRow}>
             <TouchableOpacity
               onPress={() => navigation.navigate("TransferAsset")}
-              style={{
-                flex: 1,
-                backgroundColor: "#2563eb",
-                padding: 12,
-                borderRadius: 10,
-                alignItems: "center",
-              }}
+              style={[styles.btn, styles.btnPrimary]}
             >
-              <Text style={{ color: "#fff", fontWeight: "700" }}>
-                Transfer Asset
-              </Text>
+              <Text style={styles.btnText}>Transfer Asset</Text>
             </TouchableOpacity>
             <TouchableOpacity
               onPress={() => navigation.navigate("MaintenanceRequests")}
-              style={{
-                flex: 1,
-                borderColor: "#2563eb",
-                borderWidth: 1,
-                padding: 12,
-                borderRadius: 10,
-                alignItems: "center",
-              }}
+              style={[styles.btn, styles.btnOutline]}
             >
-              <Text style={{ color: "#2563eb", fontWeight: "700" }}>
-                Maintenance
-              </Text>
+              <Text style={styles.btnOutlineText}>Maintenance</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -218,20 +136,15 @@ export default function QRDetailsScreen({ route, navigation }) {
   );
 }
 
-// Shared palette & shadows (reuse across screens)
 const COLORS = {
   bg: "#ffffff",
   surface: "#ffffff",
   text: "#0f172a",
   textMuted: "#6b7280",
   border: "#e5e7eb",
-  borderStrong: "#d1d5db",
   primary: "#2563eb",
-  primaryDark: "#1e40af",
-  primarySoft: "#dbeafe",
   inputBg: "#f9fafb",
 };
-
 const SHADOWS = {
   sm: {
     shadowColor: "#000",
@@ -247,31 +160,12 @@ const SHADOWS = {
     shadowRadius: 8,
     elevation: 3,
   },
-  lg: {
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.16,
-    shadowRadius: 16,
-    elevation: 6,
-  },
 };
 
 const styles = RNStyleSheet.create({
-  // Scroll container
-  scrollContent: {
-    padding: 16,
-    gap: 16,
-    backgroundColor: COLORS.bg,
-  },
+  scrollContent: { padding: 16, gap: 16, backgroundColor: COLORS.bg },
+  backLink: { color: COLORS.primary, fontWeight: "700", fontSize: 14 },
 
-  // Back link
-  backLink: {
-    color: COLORS.primary,
-    fontWeight: "700",
-    fontSize: 14,
-  },
-
-  // Card
   card: {
     backgroundColor: COLORS.surface,
     borderRadius: 16,
@@ -280,8 +174,6 @@ const styles = RNStyleSheet.create({
     borderColor: COLORS.border,
     ...SHADOWS.md,
   },
-
-  // Hero image
   heroImageWrap: {
     width: "100%",
     aspectRatio: 16 / 9,
@@ -290,11 +182,8 @@ const styles = RNStyleSheet.create({
     justifyContent: "center",
   },
   heroImage: { width: "100%", height: "100%" },
-
-  // Content area
   content: { padding: 16 },
 
-  // Title
   title: {
     fontSize: 20,
     fontWeight: "800",
@@ -303,7 +192,6 @@ const styles = RNStyleSheet.create({
     letterSpacing: 0.2,
   },
 
-  // Status pill (apply bg via inline override from getStatusClass)
   statusPill: {
     alignSelf: "flex-start",
     paddingHorizontal: 12,
@@ -311,14 +199,9 @@ const styles = RNStyleSheet.create({
     borderRadius: 9999,
     ...SHADOWS.sm,
   },
-  statusText: {
-    fontWeight: "800",
-  },
+  statusText: { fontWeight: "800" },
 
-  // Sections
   section: { marginTop: 16 },
-
-  // Detail rows (basic)
   detailRow: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -329,7 +212,6 @@ const styles = RNStyleSheet.create({
   rowLabel: { color: COLORS.textMuted, fontSize: 14 },
   rowValue: { fontWeight: "700", color: COLORS.text, fontSize: 14 },
 
-  // Additional box
   additionalBox: {
     backgroundColor: COLORS.inputBg,
     borderRadius: 12,
@@ -352,12 +234,7 @@ const styles = RNStyleSheet.create({
   additionalLabel: { color: COLORS.textMuted, fontSize: 13 },
   additionalValue: { fontWeight: "700", color: COLORS.text, fontSize: 13 },
 
-  // Actions
-  actionsRow: {
-    flexDirection: "row",
-    columnGap: 12,
-    marginTop: 16,
-  },
+  actionsRow: { flexDirection: "row", columnGap: 12, marginTop: 16 },
   btn: {
     flex: 1,
     paddingVertical: 12,
@@ -366,28 +243,20 @@ const styles = RNStyleSheet.create({
     justifyContent: "center",
     minHeight: 48,
   },
-  btnPrimary: {
-    backgroundColor: COLORS.primary,
-    ...SHADOWS.md,
-  },
+  btnPrimary: { backgroundColor: COLORS.primary, ...SHADOWS.md },
   btnOutline: {
     backgroundColor: COLORS.surface,
     borderWidth: 1,
     borderColor: COLORS.primary,
     ...SHADOWS.sm,
   },
-  btnText: {
-    color: "#ffffff",
-    fontWeight: "800",
-    letterSpacing: 0.3,
-  },
+  btnText: { color: "#fff", fontWeight: "800", letterSpacing: 0.3 },
   btnOutlineText: {
     color: COLORS.primary,
     fontWeight: "800",
     letterSpacing: 0.3,
   },
 
-  // Invalid QR state
   invalidWrap: {
     flex: 1,
     alignItems: "center",

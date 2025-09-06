@@ -9,14 +9,11 @@ import {
   TextInput,
   ScrollView,
   StyleSheet,
-  Modal,
 } from "react-native";
 import * as api from "../services/api";
 import { maintenanceAPI as MAINT_MAYBE } from "../services/api";
 import { Feather } from "@expo/vector-icons";
 import SparePartsModal from "../components/SparePartsModal.native";
-import { BarCodeScanner } from "expo-barcode-scanner";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 
 export default function UpdateProcessScreen({ route, navigation }) {
   const requestFromNav = route?.params?.request || null;
@@ -24,11 +21,6 @@ export default function UpdateProcessScreen({ route, navigation }) {
 
   const [request, setRequest] = useState(null);
   const [loading, setLoading] = useState(true);
-
-  // QR first-time verification state
-  const [scannerOpen, setScannerOpen] = useState(false);
-  const [hasPermission, setHasPermission] = useState(null);
-  const [scanned, setScanned] = useState(false);
 
   const [spareParts, setSpareParts] = useState([]);
   const [showSpareModal, setShowSpareModal] = useState(false);
@@ -56,26 +48,14 @@ export default function UpdateProcessScreen({ route, navigation }) {
             "Request details not found. Open this screen from the list."
           );
         }
-        const normalized = {
+        setRequest({
           _id: r._id,
           maintenanceId: r.maintenanceId || r._id,
           assetId: r.assetDetails?._id || r.assetId?._id || r.assetId,
           assetName:
             r.assetDetails?.assetName || r.assetName || "Unknown Asset",
           assetCode: r.assetDetails?.assetCode || r.assetCode || "N/A",
-        };
-        setRequest(normalized);
-
-        // ---- QR verify only first time for THIS request ----
-        const key = `qr_verified_${r._id}`;
-        const already = await AsyncStorage.getItem(key);
-        if (!already) {
-          // ask permission and open scanner
-          const { status } = await BarCodeScanner.requestPermissionsAsync();
-          setHasPermission(status === "granted");
-          setScanned(false);
-          setScannerOpen(true);
-        }
+        });
       } catch (e) {
         Alert.alert(
           "Error",
@@ -88,15 +68,6 @@ export default function UpdateProcessScreen({ route, navigation }) {
     };
     load();
   }, [requestId, requestFromNav, navigation]);
-
-  // If scanner is opened later (manually), re-check permission
-  useEffect(() => {
-    if (!scannerOpen || hasPermission !== null) return;
-    (async () => {
-      const { status } = await BarCodeScanner.requestPermissionsAsync();
-      setHasPermission(status === "granted");
-    })();
-  }, [scannerOpen, hasPermission]);
 
   const remarkOptions = useMemo(
     () => [
@@ -194,6 +165,7 @@ export default function UpdateProcessScreen({ route, navigation }) {
         );
       }
 
+      // Use the same naming as web with safe fallbacks.
       const sendAckFn =
         MAINT_MAYBE?.sendAcknowledgement ||
         api?.maintenanceAPI?.sendAcknowledgement ||
@@ -221,61 +193,6 @@ export default function UpdateProcessScreen({ route, navigation }) {
     }
   };
 
-  // ---- QR handling (first-time only) ----
-  const matchesAsset = (text) => {
-    try {
-      const maybe = JSON.parse(text);
-      const scannedCode =
-        maybe?.assetCode || maybe?.code || maybe?.asset?.code || null;
-      const scannedId =
-        maybe?.assetId || maybe?._id || maybe?.asset?._id || null;
-
-      if (
-        scannedCode &&
-        request?.assetCode &&
-        String(scannedCode) === String(request.assetCode)
-      ) {
-        return true;
-      }
-      if (
-        scannedId &&
-        request?.assetId &&
-        String(scannedId) === String(request.assetId)
-      ) {
-        return true;
-      }
-    } catch (_) {
-      // not JSON, fall back to plain text compare/contains
-    }
-    const plain = String(text || "").trim();
-    if (request?.assetCode && plain.includes(String(request.assetCode)))
-      return true;
-    if (request?.assetId && plain.includes(String(request.assetId)))
-      return true;
-    return false;
-  };
-
-  const handleBarCodeScanned = async ({ type, data }) => {
-    if (scanned) return;
-    setScanned(true);
-
-    if (!request) return;
-
-    if (matchesAsset(data)) {
-      const key = `qr_verified_${request._id}`;
-      await AsyncStorage.setItem(key, "1");
-      setScannerOpen(false);
-      Alert.alert("Verified", "QR scan matched this asset. You can proceed.");
-    } else {
-      // allow rescan
-      Alert.alert(
-        "Mismatch",
-        "This QR does not match the asset for this request. Please try again.",
-        [{ text: "OK", onPress: () => setScanned(false) }]
-      );
-    }
-  };
-
   if (loading || !request) {
     return (
       <View style={styles.center}>
@@ -292,10 +209,23 @@ export default function UpdateProcessScreen({ route, navigation }) {
       <ScrollView style={{ flex: 1 }}>
         {/* Header */}
         <View style={{ padding: 12, backgroundColor: "#fff" }}>
+          {/* <TouchableOpacity
+            onPress={() => navigation.goBack()}
+            style={{ flexDirection: "row" }}
+          >
+            <Feather name="arrow-left" size={20} color="#2563EB" />
+            <Text
+              style={{ color: "#2563EB", fontWeight: "700", marginLeft: 6 }}
+            >
+              Back
+            </Text>
+          </TouchableOpacity> */}
+
           <View style={{ marginTop: 8 }}>
             <Text style={{ fontSize: 18, fontWeight: "700", color: "#111827" }}>
               {request.assetName}
             </Text>
+            
           </View>
         </View>
 
@@ -499,117 +429,37 @@ export default function UpdateProcessScreen({ route, navigation }) {
         onClose={() => setShowSpareModal(false)}
         onAdd={handleAddSpares}
       />
-
-      {/* First-time QR verification modal */}
-      <Modal
-        visible={scannerOpen}
-        animationType="slide"
-        onRequestClose={() => setScannerOpen(false)}
-      >
-        <View style={{ flex: 1, backgroundColor: "#000" }}>
-          {/* Top bar */}
-          <View
-            style={{
-              position: "absolute",
-              top: 0,
-              left: 0,
-              right: 0,
-              paddingTop: 50,
-              paddingBottom: 12,
-              paddingHorizontal: 16,
-              backgroundColor: "rgba(0,0,0,0.35)",
-              flexDirection: "row",
-              alignItems: "center",
-              justifyContent: "space-between",
-              zIndex: 2,
-            }}
-          >
-            <Text style={{ color: "#fff", fontWeight: "800", fontSize: 16 }}>
-              Scan Asset QR (First-time verification)
-            </Text>
-            <TouchableOpacity
-              onPress={() => {
-                setScannerOpen(false);
-                setScanned(false);
-              }}
-              style={{ padding: 6 }}
-              accessibilityLabel="Close scanner"
-            >
-              <Feather name="x" size={22} color="#fff" />
-            </TouchableOpacity>
-          </View>
-
-          {hasPermission === null ? (
-            <View style={styles.center}>
-              <ActivityIndicator color="#fff" />
-              <Text style={{ color: "#fff", marginTop: 8 }}>
-                Requesting camera permission…
-              </Text>
-            </View>
-          ) : hasPermission === false ? (
-            <View style={styles.center}>
-              <Text style={{ color: "#fff", marginBottom: 10 }}>
-                Camera permission not granted.
-              </Text>
-              <TouchableOpacity
-                onPress={async () => {
-                  const { status } =
-                    await BarCodeScanner.requestPermissionsAsync();
-                  setHasPermission(status === "granted");
-                }}
-                style={{
-                  backgroundColor: "#f9fafb",
-                  paddingHorizontal: 16,
-                  paddingVertical: 10,
-                  borderRadius: 10,
-                }}
-              >
-                <Text style={{ color: "#111827", fontWeight: "800" }}>
-                  Allow Camera
-                </Text>
-              </TouchableOpacity>
-            </View>
-          ) : (
-            <>
-              <BarCodeScanner
-                onBarCodeScanned={scanned ? undefined : handleBarCodeScanned}
-                style={StyleSheet.absoluteFillObject}
-              />
-              {scanned && (
-                <TouchableOpacity
-                  style={{
-                    position: "absolute",
-                    bottom: 40,
-                    alignSelf: "center",
-                    backgroundColor: "rgba(0,0,0,0.6)",
-                    paddingHorizontal: 16,
-                    paddingVertical: 10,
-                    borderRadius: 999,
-                  }}
-                  onPress={() => setScanned(false)}
-                >
-                  <Text style={{ color: "#fff", fontWeight: "800" }}>
-                    Tap to Scan Again
-                  </Text>
-                </TouchableOpacity>
-              )}
-            </>
-          )}
-        </View>
-      </Modal>
     </>
   );
 }
 
 const styles = StyleSheet.create({
   /* ---------- Screen / Layout ---------- */
-  screen: { flex: 1, backgroundColor: "#f8fafc" },
+  screen: { flex: 1, backgroundColor: "#f8fafc" }, // optional on root
   center: {
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "transparent",
+    backgroundColor: "#f8fafc",
   },
+
+  /* ---------- Header (optional if you want to use it) ---------- */
+  headerWrap: {
+    padding: 12,
+    backgroundColor: "#ffffff",
+    borderBottomWidth: 1,
+    borderBottomColor: "#e5e7eb",
+  },
+  backRow: { flexDirection: "row", alignItems: "center" },
+  backText: { color: "#2563EB", fontWeight: "800", marginLeft: 6 },
+  titleWrap: { marginTop: 8 },
+  title: {
+    fontSize: 20,
+    fontWeight: "800",
+    color: "#0f172a",
+    letterSpacing: 0.2,
+  },
+  subtitle: { color: "#6b7280", marginTop: 2, fontWeight: "600" },
 
   /* ---------- Card ---------- */
   card: {
@@ -619,6 +469,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#ffffff",
     borderWidth: 1,
     borderColor: "#e5e7eb",
+    // soft shadow
     shadowColor: "#000",
     shadowOpacity: 0.06,
     shadowOffset: { width: 0, height: 3 },
@@ -684,6 +535,13 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#f1f5f9",
   },
+  spareChip: {
+    padding: 10,
+    backgroundColor: "#f3f4f6",
+    borderRadius: 12,
+  },
+  spareName: { fontWeight: "700", color: "#0f172a" },
+  spareMeta: { color: "#6b7280", marginTop: 2, fontWeight: "600" },
 
   /* ---------- Primary CTA ---------- */
   primaryBtn: {
@@ -694,11 +552,18 @@ const styles = StyleSheet.create({
     alignItems: "center",
     flexDirection: "row",
     justifyContent: "center",
+    // lift
     shadowColor: "#000",
     shadowOpacity: 0.12,
     shadowOffset: { width: 0, height: 8 },
     shadowRadius: 14,
     elevation: 3,
+  },
+  primaryBtnText: {
+    color: "#ffffff",
+    fontWeight: "800",
+    letterSpacing: 0.3,
+    fontSize: 15,
   },
 
   /* ---------- Utility ---------- */
@@ -710,3 +575,4 @@ const styles = StyleSheet.create({
     borderRadius: 1,
   },
 });
+

@@ -254,10 +254,15 @@ const MaintenanceRequestCard = ({
     }
   };
 
+  // inside MaintenanceRequestCard in MaintenanceRequestsScreen.js
+
   const handleStartTask = () => {
-    navigation?.navigate?.("UpdateProcess", {
-      requestId: request._id,
-      request,
+    navigation.navigate("QRScan", {
+      allowScan: true, // ✅ lets mechanics in
+      next: {
+        screen: "UpdateProcess", // where to go after a successful scan
+        params: { requestId: request._id, request },
+      },
     });
   };
 
@@ -400,7 +405,7 @@ const MaintenanceRequestCard = ({
             <TouchableOpacity
               style={styles.btnSecondary}
               onPress={() =>
-                navigation?.navigate?.("UpdateProcess", {
+                navigation.navigate("UpdateProcess", {
                   requestId: request._id,
                   request,
                 })
@@ -781,4 +786,3 @@ const styles = StyleSheet.create({
     letterSpacing: 0.2,
   },
 });
-
