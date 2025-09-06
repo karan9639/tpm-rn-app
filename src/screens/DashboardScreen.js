@@ -1,3 +1,4 @@
+// src/screens/DashboardScreen.js
 import React, { useEffect, useState, useLayoutEffect } from "react";
 import {
   View,
@@ -6,10 +7,12 @@ import {
   TouchableOpacity,
   StyleSheet,
   Alert,
+  Modal,
 } from "react-native";
 import * as api from "../services/api";
 import { useAuth } from "../context/AuthContext";
 import { MaterialCommunityIcons, Feather } from "@expo/vector-icons";
+import { BarCodeScanner } from "expo-barcode-scanner";
 
 export default function DashboardScreen({ navigation }) {
   const [stats, setStats] = useState({
@@ -20,6 +23,11 @@ export default function DashboardScreen({ navigation }) {
     special: null,
   });
   const [loading, setLoading] = useState(true);
+
+  // QR state
+  const [scannerOpen, setScannerOpen] = useState(false);
+  const [hasPermission, setHasPermission] = useState(null); // null | boolean
+  const [scanned, setScanned] = useState(false);
 
   const { user, logout } = useAuth();
   const roleRaw = (user?.role ?? user?.accountType ?? user?.employeeType ?? "")
@@ -40,6 +48,7 @@ export default function DashboardScreen({ navigation }) {
         </TouchableOpacity>
       ),
     });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [navigation]);
 
   const confirmLogout = () => {
@@ -62,8 +71,7 @@ export default function DashboardScreen({ navigation }) {
   useEffect(() => {
     (async () => {
       try {
-        const env = await api.get_asset_counting(); // <- your current API
-        // shape: { statusCode, data: [ { totalAssets:[{count}], byStatus:[...], underMaintenance:[{_id:true,total}], specialAssets:[{_id:'Yes', total}] } ], success }
+        const env = await api.get_asset_counting();
         const block = Array.isArray(env?.data) ? env.data[0] : env?.data || {};
 
         const totalAssets = block?.totalAssets?.[0]?.count ?? 0;
@@ -92,10 +100,36 @@ export default function DashboardScreen({ navigation }) {
     })();
   }, []);
 
+  // Ask camera permission when opening scanner
+  useEffect(() => {
+    if (!scannerOpen) return;
+    (async () => {
+      const { status } = await BarCodeScanner.requestPermissionsAsync();
+      setHasPermission(status === "granted");
+    })();
+  }, [scannerOpen]);
+
   const show = (v) => (v === null || v === undefined ? "—" : String(v));
+
+  const handleBarCodeScanned = ({ type, data }) => {
+    if (scanned) return;
+    setScanned(true);
+    setScannerOpen(false);
+
+    // TODO: adjust destination if needed (e.g., "AssetDetails")
+    // Pass the scanned data along for your next screen to handle.
+    navigation.navigate("Assets", {
+      scannedCode: data,
+      scannedType: type,
+    });
+
+    // If you want a quick visual confirmation:
+    // Alert.alert("Scanned", `Type: ${type}\nData: ${data}`);
+  };
 
   return (
     <View style={styles.container}>
+      {/* Header */}
       <View style={styles.header}>
         <Text style={styles.title}>Dashboard</Text>
         <Text style={styles.rolePill}>Role: {roleRaw || "—"}</Text>
@@ -129,30 +163,32 @@ export default function DashboardScreen({ navigation }) {
             <Text style={styles.statValue}>{show(stats.underMaintenance)}</Text>
           </View>
 
-          {/* Uncomment if you want to show these too */}
-          {/* <View style={[styles.statCard, styles.cardSuccess]}>
-        <View style={[styles.iconCircle, styles.iconSuccess]}>
-          <MaterialCommunityIcons name="check-circle-outline" size={18} color="#15803d" />
-        </View>
-        <Text style={styles.statLabel}>Working</Text>
-        <Text style={styles.statValue}>{show(stats.working)}</Text>
-      </View>
+          {/*
+          // Uncomment these if you'd like to show more cards
+          <View style={[styles.statCard, styles.cardSuccess]}>
+            <View style={[styles.iconCircle, styles.iconSuccess]}>
+              <MaterialCommunityIcons name="check-circle-outline" size={18} color="#15803d" />
+            </View>
+            <Text style={styles.statLabel}>Working</Text>
+            <Text style={styles.statValue}>{show(stats.working)}</Text>
+          </View>
 
-      <View style={[styles.statCard, styles.cardDanger]}>
-        <View style={[styles.iconCircle, styles.iconDanger]}>
-          <MaterialCommunityIcons name="alert-octagon-outline" size={18} color="#b91c1c" />
-        </View>
-        <Text style={styles.statLabel}>Not Working</Text>
-        <Text style={styles.statValue}>{show(stats.notWorking)}</Text>
-      </View>
+          <View style={[styles.statCard, styles.cardDanger]}>
+            <View style={[styles.iconCircle, styles.iconDanger]}>
+              <MaterialCommunityIcons name="alert-octagon-outline" size={18} color="#b91c1c" />
+            </View>
+            <Text style={styles.statLabel}>Not Working</Text>
+            <Text style={styles.statValue}>{show(stats.notWorking)}</Text>
+          </View>
 
-      <View style={[styles.statCard, styles.cardIndigo]}>
-        <View style={[styles.iconCircle, styles.iconIndigo]}>
-          <MaterialCommunityIcons name="star-outline" size={18} color="#4338ca" />
-        </View>
-        <Text style={styles.statLabel}>Special Assets</Text>
-        <Text style={styles.statValue}>{show(stats.special)}</Text>
-      </View> */}
+          <View style={[styles.statCard, styles.cardIndigo]}>
+            <View style={[styles.iconCircle, styles.iconIndigo]}>
+              <MaterialCommunityIcons name="star-outline" size={18} color="#4338ca" />
+            </View>
+            <Text style={styles.statLabel}>Special Assets</Text>
+            <Text style={styles.statValue}>{show(stats.special)}</Text>
+          </View>
+          */}
         </View>
       )}
 
@@ -169,6 +205,87 @@ export default function DashboardScreen({ navigation }) {
       >
         <Text style={styles.btnOutlineText}>Maintenance Requests</Text>
       </TouchableOpacity>
+
+      {/* QR FAB — only for production users */}
+      {isProduction && (
+        <TouchableOpacity
+          activeOpacity={0.9}
+          onPress={() => {
+            setScanned(false);
+            setScannerOpen(true);
+          }}
+          style={styles.fab}
+        >
+          <MaterialCommunityIcons name="qrcode-scan" size={26} color="#fff" />
+        </TouchableOpacity>
+      )}
+
+      {/* QR Scanner Modal */}
+      <Modal
+        visible={scannerOpen}
+        animationType="slide"
+        onRequestClose={() => setScannerOpen(false)}
+      >
+        <View style={styles.scannerContainer}>
+          {/* Top bar */}
+          <View style={styles.scannerTopBar}>
+            <Text style={styles.scannerTitle}>Scan QR Code</Text>
+            <TouchableOpacity
+              onPress={() => {
+                setScannerOpen(false);
+                setScanned(false);
+              }}
+              style={styles.closeBtn}
+              accessibilityLabel="Close scanner"
+            >
+              <Feather name="x" size={22} color="#fff" />
+            </TouchableOpacity>
+          </View>
+
+          {hasPermission === null ? (
+            <View style={styles.scannerCenter}>
+              <ActivityIndicator color="#fff" />
+              <Text style={styles.scannerText}>
+                Requesting camera permission…
+              </Text>
+            </View>
+          ) : hasPermission === false ? (
+            <View style={styles.scannerCenter}>
+              <Text style={styles.scannerText}>
+                Camera permission not granted.
+              </Text>
+              <TouchableOpacity
+                onPress={async () => {
+                  const { status } =
+                    await BarCodeScanner.requestPermissionsAsync();
+                  setHasPermission(status === "granted");
+                }}
+                style={styles.reqPermBtn}
+              >
+                <Text style={{ color: "#111827", fontWeight: "800" }}>
+                  Allow Camera
+                </Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <>
+              <BarCodeScanner
+                onBarCodeScanned={scanned ? undefined : handleBarCodeScanned}
+                style={StyleSheet.absoluteFillObject}
+              />
+              {/* Optional "scan again" when paused */}
+              {scanned && (
+                <TouchableOpacity
+                  style={styles.scanAgainBtn}
+                  onPress={() => setScanned(false)}
+                >
+                  <Text style={styles.scanAgainText}>Tap to Scan Again</Text>
+                </TouchableOpacity>
+              )}
+            </>
+          )}
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -182,21 +299,19 @@ const styles = StyleSheet.create({
   },
 
   // Header
-  header: {
-    marginBottom: 12,
-  },
+  header: { marginBottom: 12 },
   title: {
     fontSize: 24,
     fontWeight: "800",
-    color: "#0f172a", // slate-900
+    color: "#0f172a",
     marginBottom: 6,
     letterSpacing: 0.2,
   },
   rolePill: {
     alignSelf: "flex-start",
-    backgroundColor: "#eef2ff", // indigo-50
-    color: "#3730a3", // indigo-700
-    borderColor: "#c7d2fe", // indigo-200
+    backgroundColor: "#eef2ff",
+    color: "#3730a3",
+    borderColor: "#c7d2fe",
     borderWidth: 1,
     paddingVertical: 6,
     paddingHorizontal: 10,
@@ -219,17 +334,15 @@ const styles = StyleSheet.create({
     padding: 14,
     marginBottom: 12,
     borderWidth: 1,
-    borderColor: "#e5e7eb", // gray-200
-    // iOS shadow
+    borderColor: "#e5e7eb",
     shadowColor: "#000",
     shadowOpacity: 0.06,
     shadowOffset: { width: 0, height: 2 },
     shadowRadius: 8,
-    // Android
     elevation: 2,
   },
   statLabel: {
-    color: "#6b7280", // gray-500
+    color: "#6b7280",
     fontSize: 12,
     fontWeight: "700",
     textTransform: "uppercase",
@@ -237,7 +350,7 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   statValue: {
-    color: "#0f172a", // slate-900
+    color: "#0f172a",
     fontSize: 22,
     fontWeight: "800",
     marginTop: 6,
@@ -254,30 +367,29 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
 
-  // Color accents (soft backgrounds + bolder borders)
-  cardPrimary: { backgroundColor: "#eff6ff", borderColor: "#bfdbfe" }, // blue
+  // Color accents
+  cardPrimary: { backgroundColor: "#eff6ff", borderColor: "#bfdbfe" },
   iconPrimary: { backgroundColor: "#dbeafe", borderColor: "#bfdbfe" },
 
-  cardAmber: { backgroundColor: "#fffbeb", borderColor: "#fde68a" }, // amber
+  cardAmber: { backgroundColor: "#fffbeb", borderColor: "#fde68a" },
   iconAmber: { backgroundColor: "#fef3c7", borderColor: "#fde68a" },
 
-  cardSuccess: { backgroundColor: "#ecfdf5", borderColor: "#a7f3d0" }, // emerald
+  cardSuccess: { backgroundColor: "#ecfdf5", borderColor: "#a7f3d0" },
   iconSuccess: { backgroundColor: "#d1fae5", borderColor: "#a7f3d0" },
 
-  cardDanger: { backgroundColor: "#fef2f2", borderColor: "#fecaca" }, // red
+  cardDanger: { backgroundColor: "#fef2f2", borderColor: "#fecaca" },
   iconDanger: { backgroundColor: "#fee2e2", borderColor: "#fecaca" },
 
-  cardIndigo: { backgroundColor: "#eef2ff", borderColor: "#c7d2fe" }, // indigo
+  cardIndigo: { backgroundColor: "#eef2ff", borderColor: "#c7d2fe" },
   iconIndigo: { backgroundColor: "#e0e7ff", borderColor: "#c7d2fe" },
 
   // Buttons
   btn: {
-    backgroundColor: "#111827", // gray-900
+    backgroundColor: "#111827",
     paddingVertical: 14,
     borderRadius: 12,
     alignItems: "center",
     marginBottom: 10,
-    // nicer shadow
     shadowColor: "#000",
     shadowOpacity: 0.12,
     shadowOffset: { width: 0, height: 6 },
@@ -290,7 +402,6 @@ const styles = StyleSheet.create({
     letterSpacing: 0.3,
     fontSize: 15,
   },
-
   btnOutline: {
     borderWidth: 1.2,
     borderColor: "#111827",
@@ -313,7 +424,7 @@ const styles = StyleSheet.create({
     width: 60,
     height: 60,
     borderRadius: 30,
-    backgroundColor: "#2563eb", // blue-600
+    backgroundColor: "#2563eb",
     justifyContent: "center",
     alignItems: "center",
     elevation: 8,
@@ -322,5 +433,56 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 6 },
     shadowRadius: 10,
   },
-});
 
+  // Scanner modal
+  scannerContainer: {
+    flex: 1,
+    backgroundColor: "#000",
+  },
+  scannerTopBar: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    paddingTop: 50,
+    paddingBottom: 12,
+    paddingHorizontal: 16,
+    backgroundColor: "rgba(0,0,0,0.35)",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    zIndex: 2,
+  },
+  scannerTitle: {
+    color: "#fff",
+    fontWeight: "800",
+    fontSize: 16,
+  },
+  closeBtn: {
+    padding: 6,
+  },
+  scannerCenter: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 16,
+  },
+  scannerText: { color: "#fff", marginTop: 12, textAlign: "center" },
+  reqPermBtn: {
+    marginTop: 12,
+    backgroundColor: "#f9fafb",
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 10,
+  },
+  scanAgainBtn: {
+    position: "absolute",
+    bottom: 40,
+    alignSelf: "center",
+    backgroundColor: "rgba(0,0,0,0.6)",
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 999,
+  },
+  scanAgainText: { color: "#fff", fontWeight: "800" },
+});
