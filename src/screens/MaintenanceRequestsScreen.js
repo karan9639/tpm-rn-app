@@ -1,3 +1,4 @@
+// src/screens/MaintenanceRequestsScreen.js
 import React, {
   useEffect,
   useMemo,
@@ -17,9 +18,10 @@ import {
 import * as api from "../services/api";
 import { useAuth } from "../context/AuthContext";
 import MechanicAssignmentModal from "../components/MechanicAssignmentModal";
+import ProductionSatisfactionModal from "../components/ProductionSatisfactionModal";
 
 /* -----------------------------------------------
-   Helpers (status + normalizers) – aligned to web
+   Helpers (status + normalizers)
 ------------------------------------------------- */
 const deriveStatus = (req, hasMaintenanceId = false) => {
   const st = (req?.status || "").toLowerCase();
@@ -181,7 +183,7 @@ const StatusChip = ({ status }) => {
 };
 
 /* -----------------------------------------------
-   Card component – behavior mirrors your web card
+   Card – mirrors web card + production modal
 ------------------------------------------------- */
 const MaintenanceRequestCard = ({
   request,
@@ -191,8 +193,9 @@ const MaintenanceRequestCard = ({
 }) => {
   const [isCompleting, setIsCompleting] = useState(false);
   const [assignOpen, setAssignOpen] = useState(false);
+  const [prodOpen, setProdOpen] = useState(false); // modal open state
 
-  // Get production satisfaction status like on web
+  // Pull production-satisfaction flags regardless of shape
   const getProductionSatisfactionStatus = () => {
     const assetData =
       request?.assetDetails ??
@@ -209,7 +212,6 @@ const MaintenanceRequestCard = ({
         assetName: null,
       };
     }
-
     return {
       showButton: assetData.isProductionSatisfiedPopupVisible === true,
       isProductionSatisfied: assetData.isProductionSatisfiedByMechanic === true,
@@ -230,7 +232,6 @@ const MaintenanceRequestCard = ({
   const isCompleted =
     request.status === "completed" || request.isActive === false;
 
-  // --- Actions (aligned with web) ---
   const handleMaintenanceDone = async () => {
     if (!assetDetails?._id && !assetId) {
       Alert.alert("Error", "Asset ID not found. Cannot complete maintenance.");
@@ -239,13 +240,11 @@ const MaintenanceRequestCard = ({
     try {
       setIsCompleting(true);
       const id = assetDetails?._id || assetId;
-      if (api.closeMaintenanceRequest) {
-        await api.closeMaintenanceRequest(id);
-      } else if (api.close_maintenance_request) {
+      if (api.closeMaintenanceRequest) await api.closeMaintenanceRequest(id);
+      else if (api.close_maintenance_request)
         await api.close_maintenance_request(id);
-      } else if (api.maintenanceAPI?.closeMaintenanceRequest) {
+      else if (api.maintenanceAPI?.closeMaintenanceRequest)
         await api.maintenanceAPI.closeMaintenanceRequest(id);
-      }
       Alert.alert("Success", "Maintenance request completed successfully!");
       onRefresh?.();
     } catch (e) {
@@ -253,24 +252,6 @@ const MaintenanceRequestCard = ({
     } finally {
       setIsCompleting(false);
     }
-  };
-
-  const handleProductionSatisfaction = () => {
-    Alert.alert("Machine Working", `Mark ${assetName || "asset"} as working?`, [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Confirm",
-        onPress: async () => {
-          try {
-            // Optional: call your API if you have one, e.g.:
-            // await api.maintenanceAPI.setProductionSatisfied(assetId);
-            onRefresh?.();
-          } catch (e) {
-            Alert.alert("Error", e?.message || "Failed to update status.");
-          }
-        },
-      },
-    ]);
   };
 
   const handleStartTask = () => {
@@ -348,13 +329,13 @@ const MaintenanceRequestCard = ({
         </Text>
       )}
 
-      {/* Actions by role — mirrors web logic */}
+      {/* Actions by role */}
       {userRole === "production" && !isCompleted && isAssigned && (
         <>
           {showProductionSatisfactionButton && (
             <TouchableOpacity
               style={styles.btnSecondaryBlue}
-              onPress={handleProductionSatisfaction}
+              onPress={() => setProdOpen(true)}
             >
               <Text style={styles.btnSecondaryBlueText}>Machine Working</Text>
             </TouchableOpacity>
@@ -438,7 +419,7 @@ const MaintenanceRequestCard = ({
         </View>
       )}
 
-      {/* Mechanic Assignment Modal (RN) */}
+      {/* Mechanic Assignment Modal */}
       <MechanicAssignmentModal
         isOpen={assignOpen}
         onClose={() => setAssignOpen(false)}
@@ -446,6 +427,18 @@ const MaintenanceRequestCard = ({
         onSuccess={() => {
           setAssignOpen(false);
           onRefresh?.();
+        }}
+      />
+
+      {/* Production Satisfaction Modal */}
+      <ProductionSatisfactionModal
+        isOpen={prodOpen}
+        onClose={() => setProdOpen(false)}
+        assetId={assetDetails?._id || assetId}
+        assetName={assetDetails?.assetName || assetName}
+        onSuccess={() => {
+          setProdOpen(false);
+          onRefresh?.(); // refresh so supervisor can complete
         }}
       />
     </View>
@@ -495,8 +488,7 @@ export default function MaintenanceRequestsScreen({ navigation }) {
         setAllRequests(normalizeRequestData(env?.data || [], role));
         setAssignedRequests([]);
       } else {
-        // production
-        const env = await api.get_all_requests_with_mechanic();
+        const env = await api.get_all_requests_with_mechanic(); // production
         setAllRequests(normalizeRequestData(env?.data || [], role));
         setAssignedRequests([]);
       }
@@ -628,7 +620,6 @@ export default function MaintenanceRequestsScreen({ navigation }) {
 ------------------------------------------------- */
 const styles = StyleSheet.create({
   center: { flex: 1, alignItems: "center", justifyContent: "center" },
-
   card: {
     backgroundColor: "#fff",
     borderRadius: 12,
@@ -640,13 +631,9 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 1 },
     shadowRadius: 2,
   },
-
-  // small key/value text lines
   kv: { color: "#374151", marginTop: 2 },
   k: { fontWeight: "700", color: "#111827" },
   v: { fontWeight: "500", color: "#111827" },
-
-  // retry button
   tryBtn: {
     backgroundColor: "#111827",
     paddingHorizontal: 16,
@@ -654,8 +641,6 @@ const styles = StyleSheet.create({
     borderRadius: 10,
   },
   tryBtnText: { color: "#fff", fontWeight: "700" },
-
-  // filter chips
   filterRow: {
     paddingHorizontal: 12,
     paddingVertical: 8,
@@ -674,8 +659,6 @@ const styles = StyleSheet.create({
   chipActive: { backgroundColor: "#111827", borderColor: "#111827" },
   chipText: { color: "#111827", fontWeight: "600" },
   chipTextActive: { color: "#fff" },
-
-  // buttons on card
   btnPrimary: {
     marginTop: 10,
     backgroundColor: "#2563EB",
@@ -684,7 +667,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   btnPrimaryText: { color: "#fff", fontWeight: "700" },
-
   btnSecondary: {
     marginTop: 10,
     borderWidth: 1,
@@ -695,7 +677,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   btnSecondaryText: { color: "#111827", fontWeight: "700" },
-
   btnSecondaryBlue: {
     marginTop: 10,
     borderWidth: 1,
@@ -706,7 +687,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   btnSecondaryBlueText: { color: "#1D4ED8", fontWeight: "700" },
-
   btnSecondaryPurple: {
     marginTop: 10,
     borderWidth: 1,
