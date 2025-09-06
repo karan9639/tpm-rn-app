@@ -558,11 +558,9 @@ export default function MaintenanceRequestsScreen({ navigation }) {
   return (
     <View style={{ flex: 1 }}>
       {/* header */}
-      <View style={{ padding: 16, backgroundColor: "#fff" }}>
-        <Text style={{ fontSize: 18, fontWeight: "700" }}>
-          Maintenance Requests
-        </Text>
-        <Text style={{ color: "#6b7280", marginTop: 4 }}>
+      <View style={styles.headerContainer}>
+        <Text style={styles.headerTitle}>Maintenance Requests</Text>
+        <Text style={styles.headerSubtitle}>
           {role === "supervisor"
             ? "Manage and assign all maintenance requests."
             : role === "mechanic"
@@ -619,34 +617,45 @@ export default function MaintenanceRequestsScreen({ navigation }) {
    Styles
 ------------------------------------------------- */
 const styles = StyleSheet.create({
-  center: { flex: 1, alignItems: "center", justifyContent: "center" },
-  card: {
-    backgroundColor: "#fff",
-    borderRadius: 12,
-    padding: 12,
-    marginBottom: 10,
-    elevation: 2,
-    shadowColor: "#000",
-    shadowOpacity: 0.06,
-    shadowOffset: { width: 0, height: 1 },
-    shadowRadius: 2,
+  /* ---------- Shared / Layout ---------- */
+  screen: { flex: 1, backgroundColor: "#f8fafc" }, // optional: use on root <View>
+  center: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#f8fafc",
   },
-  kv: { color: "#374151", marginTop: 2 },
-  k: { fontWeight: "700", color: "#111827" },
-  v: { fontWeight: "500", color: "#111827" },
-  tryBtn: {
-    backgroundColor: "#111827",
+
+  /* ---------- Header ---------- */
+  headerContainer: {
     paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderRadius: 10,
+    paddingVertical: 14,
+    backgroundColor: "#ffffff",
+    borderBottomWidth: 1,
+    borderBottomColor: "#e5e7eb",
   },
-  tryBtnText: { color: "#fff", fontWeight: "700" },
+  headerTitle: {
+    fontSize: 20,
+    fontWeight: "800",
+    color: "#0f172a",
+    letterSpacing: 0.2,
+  },
+  headerSubtitle: {
+    color: "#64748b",
+    marginTop: 4,
+    fontWeight: "600",
+  },
+
+  /* ---------- Filters ---------- */
   filterRow: {
     paddingHorizontal: 12,
-    paddingVertical: 8,
+    paddingVertical: 10,
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 8,
+    backgroundColor: "#f8fafc",
+    borderBottomWidth: 1,
+    borderBottomColor: "#e5e7eb",
   },
   chip: {
     paddingHorizontal: 12,
@@ -654,47 +663,122 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     borderWidth: 1,
     borderColor: "#e5e7eb",
-    backgroundColor: "#fff",
+    backgroundColor: "#ffffff",
+    // subtle lift
+    shadowColor: "#000",
+    shadowOpacity: 0.03,
+    shadowOffset: { width: 0, height: 1 },
+    shadowRadius: 2,
+    elevation: 1,
   },
-  chipActive: { backgroundColor: "#111827", borderColor: "#111827" },
-  chipText: { color: "#111827", fontWeight: "600" },
-  chipTextActive: { color: "#fff" },
+  chipActive: {
+    backgroundColor: "#111827",
+    borderColor: "#111827",
+    shadowOpacity: 0.08,
+    shadowOffset: { width: 0, height: 3 },
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  chipText: { color: "#111827", fontWeight: "700", letterSpacing: 0.2 },
+  chipTextActive: { color: "#ffffff" },
+
+  /* ---------- Card ---------- */
+  card: {
+    backgroundColor: "#ffffff",
+    borderRadius: 16,
+    padding: 14,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: "#e5e7eb",
+    // soft shadow
+    shadowColor: "#000",
+    shadowOpacity: 0.06,
+    shadowOffset: { width: 0, height: 3 },
+    shadowRadius: 8,
+    elevation: 2,
+  },
+
+  /* ---------- Key–Value Text ---------- */
+  kv: { color: "#374151", marginTop: 2 },
+  k: {
+    fontWeight: "800",
+    color: "#0f172a",
+    textTransform: "uppercase",
+    fontSize: 12,
+    letterSpacing: 0.6,
+  },
+  v: { fontWeight: "600", color: "#0f172a" },
+
+  /* ---------- Error / Retry ---------- */
+  tryBtn: {
+    backgroundColor: "#111827",
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 12,
+    // lift
+    shadowColor: "#000",
+    shadowOpacity: 0.1,
+    shadowOffset: { width: 0, height: 6 },
+    shadowRadius: 12,
+    elevation: 3,
+  },
+  tryBtnText: { color: "#ffffff", fontWeight: "800", letterSpacing: 0.3 },
+
+  /* ---------- Buttons ---------- */
   btnPrimary: {
     marginTop: 10,
-    backgroundColor: "#2563EB",
-    borderRadius: 10,
+    backgroundColor: "#2563eb", // blue-600
+    borderRadius: 12,
     paddingVertical: 12,
     alignItems: "center",
+    // lift
+    shadowColor: "#000",
+    shadowOpacity: 0.12,
+    shadowOffset: { width: 0, height: 6 },
+    shadowRadius: 10,
+    elevation: 3,
   },
-  btnPrimaryText: { color: "#fff", fontWeight: "700" },
+  btnPrimaryText: { color: "#ffffff", fontWeight: "800", letterSpacing: 0.3 },
+
   btnSecondary: {
     marginTop: 10,
     borderWidth: 1,
-    borderColor: "#E5E7EB",
-    backgroundColor: "#FFFFFF",
-    borderRadius: 10,
+    borderColor: "#e5e7eb",
+    backgroundColor: "#ffffff",
+    borderRadius: 12,
     paddingVertical: 12,
     alignItems: "center",
   },
-  btnSecondaryText: { color: "#111827", fontWeight: "700" },
+  btnSecondaryText: { color: "#111827", fontWeight: "800", letterSpacing: 0.2 },
+
   btnSecondaryBlue: {
     marginTop: 10,
     borderWidth: 1,
-    borderColor: "#BFDBFE",
-    backgroundColor: "#EFF6FF",
-    borderRadius: 10,
+    borderColor: "#bfdbfe",
+    backgroundColor: "#eff6ff",
+    borderRadius: 12,
     paddingVertical: 12,
     alignItems: "center",
   },
-  btnSecondaryBlueText: { color: "#1D4ED8", fontWeight: "700" },
+  btnSecondaryBlueText: {
+    color: "#1d4ed8",
+    fontWeight: "800",
+    letterSpacing: 0.2,
+  },
+
   btnSecondaryPurple: {
     marginTop: 10,
     borderWidth: 1,
-    borderColor: "#DDD6FE",
-    backgroundColor: "#F5F3FF",
-    borderRadius: 10,
+    borderColor: "#ddd6fe",
+    backgroundColor: "#f5f3ff",
+    borderRadius: 12,
     paddingVertical: 12,
     alignItems: "center",
   },
-  btnSecondaryPurpleText: { color: "#6D28D9", fontWeight: "700" },
+  btnSecondaryPurpleText: {
+    color: "#6d28d9",
+    fontWeight: "800",
+    letterSpacing: 0.2,
+  },
 });
+

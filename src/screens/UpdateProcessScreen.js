@@ -209,7 +209,7 @@ export default function UpdateProcessScreen({ route, navigation }) {
       <ScrollView style={{ flex: 1 }}>
         {/* Header */}
         <View style={{ padding: 12, backgroundColor: "#fff" }}>
-          <TouchableOpacity
+          {/* <TouchableOpacity
             onPress={() => navigation.goBack()}
             style={{ flexDirection: "row" }}
           >
@@ -219,15 +219,13 @@ export default function UpdateProcessScreen({ route, navigation }) {
             >
               Back
             </Text>
-          </TouchableOpacity>
+          </TouchableOpacity> */}
 
           <View style={{ marginTop: 8 }}>
             <Text style={{ fontSize: 18, fontWeight: "700", color: "#111827" }}>
-              Update Process
+              {request.assetName}
             </Text>
-            <Text style={{ color: "#6B7280", marginTop: 2 }}>
-              {request.assetCode} - {request.assetName}
-            </Text>
+            
           </View>
         </View>
 
@@ -436,59 +434,145 @@ export default function UpdateProcessScreen({ route, navigation }) {
 }
 
 const styles = StyleSheet.create({
-  center: { flex: 1, alignItems: "center", justifyContent: "center" },
+  /* ---------- Screen / Layout ---------- */
+  screen: { flex: 1, backgroundColor: "#f8fafc" }, // optional on root
+  center: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#f8fafc",
+  },
+
+  /* ---------- Header (optional if you want to use it) ---------- */
+  headerWrap: {
+    padding: 12,
+    backgroundColor: "#ffffff",
+    borderBottomWidth: 1,
+    borderBottomColor: "#e5e7eb",
+  },
+  backRow: { flexDirection: "row", alignItems: "center" },
+  backText: { color: "#2563EB", fontWeight: "800", marginLeft: 6 },
+  titleWrap: { marginTop: 8 },
+  title: {
+    fontSize: 20,
+    fontWeight: "800",
+    color: "#0f172a",
+    letterSpacing: 0.2,
+  },
+  subtitle: { color: "#6b7280", marginTop: 2, fontWeight: "600" },
+
+  /* ---------- Card ---------- */
   card: {
     margin: 12,
-    padding: 12,
-    borderRadius: 12,
-    backgroundColor: "#fff",
-    elevation: 2,
+    padding: 14,
+    borderRadius: 16,
+    backgroundColor: "#ffffff",
+    borderWidth: 1,
+    borderColor: "#e5e7eb",
+    // soft shadow
     shadowColor: "#000",
     shadowOpacity: 0.06,
-    shadowOffset: { width: 0, height: 1 },
-    shadowRadius: 2,
+    shadowOffset: { width: 0, height: 3 },
+    shadowRadius: 8,
+    elevation: 2,
+  },
+
+  /* ---------- Field Labels / Inputs ---------- */
+  label: {
+    fontWeight: "800",
+    color: "#0f172a",
+    marginBottom: 6,
+    textTransform: "uppercase",
+    letterSpacing: 0.6,
+    fontSize: 12,
   },
   input: {
     borderWidth: 1,
-    borderColor: "#E5E7EB",
-    borderRadius: 10,
-    padding: 12,
-    backgroundColor: "#fff",
+    borderColor: "#e5e7eb",
+    borderRadius: 14,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    backgroundColor: "#ffffff",
+    fontSize: 15,
+    color: "#0f172a",
   },
-  label: { fontWeight: "700", color: "#111827", marginBottom: 6 },
+
+  /* ---------- Select (press-to-open Alert) ---------- */
   select: {
     borderWidth: 1,
-    borderColor: "#E5E7EB",
-    borderRadius: 10,
+    borderColor: "#e5e7eb",
+    borderRadius: 14,
     paddingHorizontal: 12,
     paddingVertical: 12,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    backgroundColor: "#fff",
+    backgroundColor: "#ffffff",
   },
-  selectText: { color: "#111827", fontWeight: "500", flex: 1, marginRight: 8 },
-  emptyBox: {
-    backgroundColor: "#F9FAFB",
-    borderRadius: 10,
-    paddingVertical: 18,
-    alignItems: "center",
+  selectText: {
+    color: "#0f172a",
+    fontWeight: "600",
+    flex: 1,
+    marginRight: 8,
   },
+
+  /* ---------- Spares Section ---------- */
   pillBtn: {
     borderWidth: 1,
-    paddingHorizontal: 10,
+    borderColor: "#bfdbfe",
+    backgroundColor: "#eff6ff",
+    paddingHorizontal: 12,
     paddingVertical: 8,
-    borderRadius: 10,
+    borderRadius: 999,
     flexDirection: "row",
     alignItems: "center",
   },
+  emptyBox: {
+    backgroundColor: "#f9fafb",
+    borderRadius: 12,
+    paddingVertical: 18,
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#f1f5f9",
+  },
+  spareChip: {
+    padding: 10,
+    backgroundColor: "#f3f4f6",
+    borderRadius: 12,
+  },
+  spareName: { fontWeight: "700", color: "#0f172a" },
+  spareMeta: { color: "#6b7280", marginTop: 2, fontWeight: "600" },
+
+  /* ---------- Primary CTA ---------- */
   primaryBtn: {
     marginTop: 16,
     backgroundColor: "#2563EB",
-    borderRadius: 10,
+    borderRadius: 14,
     paddingVertical: 14,
     alignItems: "center",
     flexDirection: "row",
     justifyContent: "center",
+    // lift
+    shadowColor: "#000",
+    shadowOpacity: 0.12,
+    shadowOffset: { width: 0, height: 8 },
+    shadowRadius: 14,
+    elevation: 3,
+  },
+  primaryBtnText: {
+    color: "#ffffff",
+    fontWeight: "800",
+    letterSpacing: 0.3,
+    fontSize: 15,
+  },
+
+  /* ---------- Utility ---------- */
+  muted: { color: "#6b7280" },
+  divider: {
+    height: 1,
+    backgroundColor: "#f1f5f9",
+    marginVertical: 10,
+    borderRadius: 1,
   },
 });
+

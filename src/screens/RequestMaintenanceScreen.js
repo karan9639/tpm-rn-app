@@ -106,37 +106,169 @@ export default function RequestMaintenanceScreen({ route, navigation }) {
   );
 }
 
+const COLORS = {
+  bg: "#ffffff",
+  surface: "#ffffff",
+  text: "#0f172a",
+  textMuted: "#6b7280",
+  border: "#e5e7eb",
+  borderStrong: "#d1d5db",
+  primary: "#2563eb",
+  primaryDark: "#1e40af",
+  primarySoft: "#dbeafe",
+  primaryBorder: "#93c5fd",
+  chipBg: "#ffffff",
+  chipText: "#111827",
+  error: "#b00020",
+  errorBg: "#fef2f2",
+  errorBorder: "#fecaca",
+  inputBg: "#f9fafb",
+  ghostBg: "#f3f4f6",
+};
+
+const SHADOWS = {
+  sm: {
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.08,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  md: {
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.12,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  lg: {
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.16,
+    shadowRadius: 16,
+    elevation: 6,
+  },
+};
+
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 16, backgroundColor: "#fff" },
-  title: { fontSize: 18, fontWeight: "700", marginBottom: 4 },
-  subtitle: { color: "#6b7280", marginBottom: 12 },
-  label: { fontWeight: "600", color: "#111827", marginBottom: 6 },
-  chipsRow: { flexDirection: "row", gap: 8, marginBottom: 6 },
+  container: {
+    flex: 1,
+    padding: 18,
+    backgroundColor: COLORS.bg,
+  },
+
+  // Headers
+  title: {
+    fontSize: 22,
+    fontWeight: "800",
+    color: COLORS.text,
+    letterSpacing: 0.2,
+    marginBottom: 6,
+  },
+  subtitle: {
+    color: COLORS.textMuted,
+    fontSize: 14,
+    marginBottom: 14,
+  },
+
+  // Labels
+  label: {
+    fontWeight: "700",
+    color: COLORS.text,
+    marginBottom: 8,
+    fontSize: 14,
+  },
+
+  // Priority Chips
+  chipsRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10,
+    marginBottom: 8,
+  },
   chip: {
-    paddingVertical: 8,
-    paddingHorizontal: 14,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
     borderRadius: 999,
     borderWidth: 1,
-    borderColor: "#e5e7eb",
-    backgroundColor: "#fff",
+    borderColor: COLORS.border,
+    backgroundColor: COLORS.chipBg,
+    ...SHADOWS.sm,
   },
-  chipSelected: { backgroundColor: "#dbeafe", borderColor: "#93c5fd" },
-  chipText: { color: "#111827", fontWeight: "600" },
-  chipTextSelected: { color: "#1e40af" },
+  chipSelected: {
+    backgroundColor: COLORS.primarySoft,
+    borderColor: COLORS.primaryBorder,
+    ...SHADOWS.md,
+  },
+  chipText: {
+    color: COLORS.chipText,
+    fontWeight: "700",
+    letterSpacing: 0.2,
+  },
+  chipTextSelected: {
+    color: COLORS.primaryDark,
+  },
+
+  // Input
   input: {
     borderWidth: 1,
-    borderColor: "#e5e7eb",
-    borderRadius: 10,
-    padding: 12,
-    minHeight: 120,
+    borderColor: COLORS.border,
+    borderRadius: 12,
+    padding: 14,
+    minHeight: 130,
     textAlignVertical: "top",
-    backgroundColor: "#fff",
+    backgroundColor: COLORS.inputBg,
+    fontSize: 16,
+    lineHeight: 22,
+    ...SHADOWS.sm,
   },
-  error: { color: "#b00020", marginTop: 10 },
-  row: { flexDirection: "row", gap: 10, marginTop: 16 },
-  btn: { flex: 1, paddingVertical: 14, borderRadius: 10, alignItems: "center" },
-  btnPrimary: { backgroundColor: "#2563eb" },
-  btnGhost: { backgroundColor: "#f3f4f6" },
-  btnText: { color: "#fff", fontWeight: "700" },
-  btnGhostText: { color: "#111827" },
+
+  // Error
+  error: {
+    color: COLORS.error,
+    backgroundColor: COLORS.errorBg,
+    borderWidth: 1,
+    borderColor: COLORS.errorBorder,
+    borderRadius: 10,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    marginTop: 12,
+    fontSize: 13,
+  },
+
+  // Buttons
+  row: {
+    flexDirection: "row",
+    gap: 12,
+    marginTop: 20,
+  },
+  btn: {
+    flex: 1,
+    minHeight: 52,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    ...SHADOWS.md,
+  },
+  btnPrimary: {
+    backgroundColor: COLORS.primary,
+  },
+  btnGhost: {
+    backgroundColor: COLORS.ghostBg,
+    borderWidth: 1,
+    borderColor: COLORS.borderStrong,
+    ...SHADOWS.sm,
+  },
+  btnText: {
+    color: "#ffffff",
+    fontWeight: "800",
+    fontSize: 16,
+    letterSpacing: 0.3,
+  },
+  btnGhostText: {
+    color: COLORS.text,
+  },
 });
+
