@@ -137,7 +137,9 @@ export default function AssetDetailsScreen({ route, navigation }) {
               onPress={() => navigation.navigate("TransferAsset", { asset })}
               style={[styles.btn, styles.btnSecondary]}
             >
-              <Text style={styles.btnText}>Transfer Asset</Text>
+              <Text style={[styles.btnText, styles.btnTextSecondary]}>
+                Transfer Asset
+              </Text>
             </TouchableOpacity>
           )}
 
@@ -158,7 +160,9 @@ export default function AssetDetailsScreen({ route, navigation }) {
                   isUnderMaint && styles.btnDisabled,
                 ]}
               >
-                <Text style={styles.btnText}>Request Maintenance</Text>
+                <Text style={[styles.btnText, styles.btnTextPrimary]}>
+                  Request Maintenance
+                </Text>
               </TouchableOpacity>
               {isUnderMaint && (
                 <Text style={styles.helperWarn}>
@@ -218,7 +222,9 @@ const styles = StyleSheet.create({
   btnPrimary: { backgroundColor: "#2563eb" },
   btnSecondary: { backgroundColor: "#e5e7eb" },
   btnDisabled: { opacity: 0.6 },
-  btnText: { color: "#fff", fontWeight: "700" },
+  btnText: { fontWeight: "700" },
+  btnTextPrimary: { color: "#fff" },
+  btnTextSecondary: { color: "#111827" },
   helperWarn: {
     textAlign: "center",
     fontSize: 12,
