@@ -1,6 +1,13 @@
 // src/screens/QRDetailsScreen.js
 import React from "react";
-import { View, Text, ScrollView, Image, TouchableOpacity } from "react-native";
+import {
+  View,
+  Text,
+  ScrollView,
+  Image,
+  TouchableOpacity,
+  StyleSheet as RNStyleSheet,
+} from "react-native";
 
 export default function QRDetailsScreen({ route, navigation }) {
   const raw = route?.params?.data || "";
@@ -210,3 +217,197 @@ export default function QRDetailsScreen({ route, navigation }) {
     </ScrollView>
   );
 }
+
+// Shared palette & shadows (reuse across screens)
+const COLORS = {
+  bg: "#ffffff",
+  surface: "#ffffff",
+  text: "#0f172a",
+  textMuted: "#6b7280",
+  border: "#e5e7eb",
+  borderStrong: "#d1d5db",
+  primary: "#2563eb",
+  primaryDark: "#1e40af",
+  primarySoft: "#dbeafe",
+  inputBg: "#f9fafb",
+};
+
+const SHADOWS = {
+  sm: {
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.08,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  md: {
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.12,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  lg: {
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.16,
+    shadowRadius: 16,
+    elevation: 6,
+  },
+};
+
+const styles = RNStyleSheet.create({
+  // Scroll container
+  scrollContent: {
+    padding: 16,
+    gap: 16,
+    backgroundColor: COLORS.bg,
+  },
+
+  // Back link
+  backLink: {
+    color: COLORS.primary,
+    fontWeight: "700",
+    fontSize: 14,
+  },
+
+  // Card
+  card: {
+    backgroundColor: COLORS.surface,
+    borderRadius: 16,
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    ...SHADOWS.md,
+  },
+
+  // Hero image
+  heroImageWrap: {
+    width: "100%",
+    aspectRatio: 16 / 9,
+    backgroundColor: COLORS.border,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  heroImage: { width: "100%", height: "100%" },
+
+  // Content area
+  content: { padding: 16 },
+
+  // Title
+  title: {
+    fontSize: 20,
+    fontWeight: "800",
+    color: COLORS.text,
+    marginBottom: 10,
+    letterSpacing: 0.2,
+  },
+
+  // Status pill (apply bg via inline override from getStatusClass)
+  statusPill: {
+    alignSelf: "flex-start",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 9999,
+    ...SHADOWS.sm,
+  },
+  statusText: {
+    fontWeight: "800",
+  },
+
+  // Sections
+  section: { marginTop: 16 },
+
+  // Detail rows (basic)
+  detailRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
+  },
+  rowLabel: { color: COLORS.textMuted, fontSize: 14 },
+  rowValue: { fontWeight: "700", color: COLORS.text, fontSize: 14 },
+
+  // Additional box
+  additionalBox: {
+    backgroundColor: COLORS.inputBg,
+    borderRadius: 12,
+    padding: 12,
+    marginTop: 16,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  additionalTitle: {
+    fontWeight: "800",
+    marginBottom: 8,
+    color: COLORS.text,
+    letterSpacing: 0.2,
+  },
+  additionalRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    paddingVertical: 6,
+  },
+  additionalLabel: { color: COLORS.textMuted, fontSize: 13 },
+  additionalValue: { fontWeight: "700", color: COLORS.text, fontSize: 13 },
+
+  // Actions
+  actionsRow: {
+    flexDirection: "row",
+    columnGap: 12,
+    marginTop: 16,
+  },
+  btn: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    minHeight: 48,
+  },
+  btnPrimary: {
+    backgroundColor: COLORS.primary,
+    ...SHADOWS.md,
+  },
+  btnOutline: {
+    backgroundColor: COLORS.surface,
+    borderWidth: 1,
+    borderColor: COLORS.primary,
+    ...SHADOWS.sm,
+  },
+  btnText: {
+    color: "#ffffff",
+    fontWeight: "800",
+    letterSpacing: 0.3,
+  },
+  btnOutlineText: {
+    color: COLORS.primary,
+    fontWeight: "800",
+    letterSpacing: 0.3,
+  },
+
+  // Invalid QR state
+  invalidWrap: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 16,
+    backgroundColor: COLORS.bg,
+  },
+  invalidTitle: {
+    fontSize: 18,
+    fontWeight: "800",
+    marginBottom: 4,
+    color: COLORS.text,
+  },
+  invalidText: { color: COLORS.textMuted, textAlign: "center" },
+  invalidBtn: {
+    marginTop: 12,
+    backgroundColor: COLORS.primary,
+    padding: 12,
+    borderRadius: 12,
+    ...SHADOWS.md,
+  },
+  invalidBtnText: { color: "#fff", fontWeight: "800", letterSpacing: 0.2 },
+});
