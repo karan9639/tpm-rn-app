@@ -1,20 +1,20 @@
 // app.config.js
-export default ({ config }) => ({
+export default () => ({
   expo: {
     name: "TPM Mobile",
     slug: "tpm-rn-expo",
     scheme: "tpm",
-    version: "1.0.0",
-    orientation: "portrait",
+    version: "1.0.1",
 
-    // Global icon (used by iOS + older Android launchers)
+    // iOS + legacy Android
     icon: "./assets/icon.png",
 
+    orientation: "portrait",
     userInterfaceStyle: "automatic",
     splash: {
       image: "./assets/splash.png",
       resizeMode: "contain",
-      backgroundColor: "#0F172A", // feel free to keep #ffffff if you prefer
+      backgroundColor: "#0F172A",
     },
 
     assetBundlePatterns: ["**/*"],
@@ -27,21 +27,17 @@ export default ({ config }) => ({
 
     android: {
       package: "com.k2p.tpm",
-      versionCode: 1,
-      // Fallback icon for legacy launchers (still good to be explicit)
-      icon: "./assets/icon.png",
+      versionCode: 2, // bump when rebuilding
+      icon: "./assets/icon.png", // legacy fallback
       adaptiveIcon: {
-        foregroundImage: "./assets/adaptive-icon.png",
+        foregroundImage: "./assets/adaptive-icon.png", // transparent-only logo
         backgroundColor: "#0F172A",
-        // monochromeImage: "./assets/adaptive-icon-monochrome.png", // optional (Android 13+)
+        monochromeImage: "./assets/adaptive-icon-monochrome.png", // optional but nice
       },
       permissions: [],
     },
 
-    web: {
-      bundler: "metro",
-      favicon: "./assets/icon.png",
-    },
+    web: { bundler: "metro", favicon: "./assets/icon.png" },
 
     extra: {
       eas: { projectId: "8c62cd08-341d-4742-b004-79afff07d3cd" },
