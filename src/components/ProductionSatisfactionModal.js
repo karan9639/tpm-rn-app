@@ -50,17 +50,11 @@ export default function ProductionSatisfactionModal({
       setIsSubmitting(true);
       setErrors({});
 
-      // Match web intent but satisfy backend requirement
-      const ackText =
-        satisfaction === "No"
-          ? remark.trim()
-          : "Working properly after maintenance";
-
+      // ✅ Backend requires `acknowledgement`
       const payload = {
-        isProductionSatisfiedByMechanic: satisfaction, // "Yes" | "No"
-        acknowledgement: ackText, // <-- backend requires this
-        // keep 'remark' too to mirror the web payload shape
-        remark: satisfaction === "No" ? remark.trim() : null,
+        acknowledgement: satisfaction === "Yes", // boolean
+        isProductionSatisfiedByMechanic: satisfaction, // keep the human label if backend uses it
+        ...(satisfaction === "No" ? { remark: remark.trim() } : {}), // omit when "Yes"
       };
 
       if (!submitFn) {
@@ -80,7 +74,9 @@ export default function ProductionSatisfactionModal({
         );
       }
     } catch (error) {
-      setErrors({ submit: error?.message || "Submission failed" });
+      const serverMsg =
+        error?.response?.data?.message || error?.message || "Submission failed";
+      setErrors({ submit: serverMsg });
     } finally {
       setIsSubmitting(false);
     }
