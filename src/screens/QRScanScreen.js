@@ -5,53 +5,88 @@ import {
   ActivityIndicator,
   TouchableOpacity,
   StyleSheet,
+  Alert,
 } from "react-native";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import { useIsFocused } from "@react-navigation/native";
-import UnauthorizedScreen from "./UnauthorizedScreen";
+import * as api from "../services/api";
 
-export default function QRScanScreen({ route, navigation }) {
-  // Open camera only if caller explicitly allowed it
-  const allowScan = route?.params?.allowScan === true;
-  const next = route?.params?.next; // { screen, params }
+/* ----------------- helpers ----------------- */
+const safeDecode = (s) => {
+  try {
+    return decodeURIComponent(s);
+  } catch {
+    return s;
+  }
+};
 
-  // HOOKS (must be declared before any return)
+function getAssetIdFrom(anything) {
+  if (!anything) return null;
+
+  if (typeof anything === "object") {
+    return (
+      anything.assetId ||
+      anything.id ||
+      anything.asset_id ||
+      anything.code ||
+      null
+    );
+  }
+
+  const s = String(anything).trim();
+
+  // Try JSON
+  try {
+    const obj = JSON.parse(safeDecode(s));
+    const id =
+      obj.assetId || obj.id || obj.asset_id || obj.code || obj.asset?.id;
+    if (id) return String(id);
+  } catch {}
+
+  // Try URL (?assetId= / ?id= / ?code=) or path tail
+  try {
+    if (s.includes("://") || s.startsWith("http")) {
+      const u = new URL(s);
+      const qp = u.searchParams;
+      const qId =
+        qp.get("assetId") ||
+        qp.get("asset_id") ||
+        qp.get("id") ||
+        qp.get("code");
+      if (qId) return safeDecode(qId);
+      const tail = u.pathname.split("/").filter(Boolean).pop();
+      if (tail) return safeDecode(tail);
+    }
+  } catch {}
+
+  // Fallback: look for …assetId=… patterns
+  const m = s.match(/(?:assetId|asset_id|id|code)=([^&#]+)/i);
+  if (m?.[1]) return safeDecode(m[1]);
+
+  // Raw string looks like an id already
+  if (s.length) return s;
+
+  return null;
+}
+
+/* ----------------- screen ----------------- */
+export default function QRScanScreen({ navigation }) {
   const isFocused = useIsFocused();
   const [permission, requestPermission] = useCameraPermissions();
+
   const [ready, setReady] = useState(false);
   const [scanned, setScanned] = useState(false);
+  const [fetching, setFetching] = useState(false);
+  const [err, setErr] = useState("");
   const throttleRef = useRef(0);
 
-  const handleScanned = useCallback(
-    ({ data, type }) => {
-      if (scanned) return;
-
-      const now = Date.now();
-      if (now - throttleRef.current < 800) return; // throttle double fires
-      throttleRef.current = now;
-
-      setScanned(true);
-
-      if (next?.screen) {
-        navigation.replace(next.screen, {
-          ...(next.params || {}),
-          scannedData: data,
-          scannedType: type,
-        });
-      } else {
-        navigation.replace("QRDetails", { data, type });
-      }
-    },
-    [navigation, next, scanned]
-  );
-
-  // Ask permission when focused
+  // ask permission when focused
   useEffect(() => {
     let alive = true;
     (async () => {
       setReady(false);
       setScanned(false);
-
+      setErr("");
       if (!isFocused) {
         if (alive) setReady(true);
         return;
@@ -66,10 +101,67 @@ export default function QRScanScreen({ route, navigation }) {
     };
   }, [isFocused, permission?.status, requestPermission]);
 
-  // Gate — if caller didn’t allow, show Unauthorized
-  if (!allowScan) return <UnauthorizedScreen />;
+  const fetchAndGo = useCallback(
+    async (assetId) => {
+      setFetching(true);
+      setErr("");
+      try {
+        const res = await api.get_asset_details(assetId);
+        // Support {data: {...}} or direct {...}
+        const payload = res?.data ?? res;
 
-  // Permission flow UIs
+        if (
+          !payload ||
+          (typeof payload === "object" && Object.keys(payload).length === 0)
+        ) {
+          throw new Error("Asset not found.");
+        }
+
+        // Go to details – your AssetDetails screen already fetches by id,
+        // but we pass initialAsset to avoid a second spinner.
+        navigation.replace("AssetDetails", {
+          assetId,
+          initialAsset: payload,
+          fromQR: true,
+        });
+      } catch (e) {
+        const msg = e?.message || "Failed to load asset.";
+        setErr(msg);
+        Alert.alert("Scan Result", msg, [{ text: "OK" }]);
+        setScanned(false); // allow retry
+      } finally {
+        setFetching(false);
+      }
+    },
+    [navigation]
+  );
+
+  const handleScanned = useCallback(
+    ({ data, type }) => {
+      if (scanned || fetching) return;
+
+      const now = Date.now();
+      if (now - throttleRef.current < 800) return;
+      throttleRef.current = now;
+
+      setScanned(true);
+      setErr("");
+
+      const assetId = getAssetIdFrom(data);
+      if (!assetId) {
+        setErr("Could not read asset ID from the QR code.");
+        Alert.alert("Invalid QR", "Could not read asset ID from the QR code.", [
+          { text: "Try again", onPress: () => setScanned(false) },
+        ]);
+        return;
+      }
+
+      fetchAndGo(assetId);
+    },
+    [scanned, fetching, fetchAndGo]
+  );
+
+  /* ---------- permission/ready UIs ---------- */
   if (!ready || !permission) {
     return (
       <View style={styles.center}>
@@ -93,7 +185,7 @@ export default function QRScanScreen({ route, navigation }) {
     );
   }
 
-  // Scanner
+  /* ----------------- view ----------------- */
   return (
     <View style={styles.container}>
       {isFocused && (
@@ -110,17 +202,33 @@ export default function QRScanScreen({ route, navigation }) {
         <View style={styles.frame}>
           <View style={styles.scanLine} />
         </View>
-        <Text style={styles.caption}>Point your camera at a QR code</Text>
-        {scanned && (
-          <Text style={[styles.caption, { marginTop: 8, opacity: 0.8 }]}>
-            Processing…
+        <Text style={styles.caption}>
+          {fetching ? "Fetching asset…" : "Point your camera at a QR code"}
+        </Text>
+        {!!err && (
+          <Text
+            style={[
+              styles.caption,
+              { marginTop: 8, opacity: 0.9, color: "#fecaca" },
+            ]}
+          >
+            {err}
           </Text>
+        )}
+        {scanned && !fetching && (
+          <TouchableOpacity
+            style={styles.retryBtnDark}
+            onPress={() => setScanned(false)}
+          >
+            <Text style={styles.retryTextLight}>Scan Again</Text>
+          </TouchableOpacity>
         )}
       </View>
     </View>
   );
 }
 
+/* ----------------- styles ----------------- */
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#000" },
   camera: { position: "absolute", top: 0, right: 0, bottom: 0, left: 0 },
@@ -140,6 +248,14 @@ const styles = StyleSheet.create({
     borderRadius: 10,
   },
   retryText: { color: "#111827", fontWeight: "800" },
+  retryBtnDark: {
+    marginTop: 12,
+    backgroundColor: "rgba(0,0,0,0.6)",
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 999,
+  },
+  retryTextLight: { color: "#fff", fontWeight: "800" },
   overlay: {
     position: "absolute",
     top: 0,

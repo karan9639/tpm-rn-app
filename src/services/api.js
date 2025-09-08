@@ -102,11 +102,27 @@ export const get_current_user = () => apiFetch("/user/hr/employee/employees");
 /* =========================
    ASSETS
 ========================= */
-export const get_assets = () => apiFetch("/asset/assets");
-export const get_asset_details = (assetId) =>
-  apiFetch(`/asset/asset/${assetId}`);
-export const get_asset_counting = () =>
+
+export const getAllAssets = () => apiFetch("/asset/assets");
+
+export const getAssetById = (assetId) =>
+  apiFetch(`/asset/asset/${encodeURIComponent(assetId)}`);
+
+export const getAssetCounting = () =>
   apiFetch("/asset/assets-counting-with-category");
+
+// Back-compat aliases (leave these so old calls still work)
+export const get_assets = getAllAssets;
+export const get_asset_details = getAssetById;
+export const get_asset_counting = getAssetCounting;
+
+// Web-parity wrapper (same shape as your web app)
+export const assetAPI = {
+  getAllAssets,
+  getAssetById,
+  getAssetCounting,
+};
+
 
 /* =========================
    HR / LOCATION / TRANSFER

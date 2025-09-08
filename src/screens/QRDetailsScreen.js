@@ -1,5 +1,4 @@
-// src/screens/QRDetailsScreen.js
-import React from "react";
+import React, { useEffect } from "react";
 import {
   View,
   Text,
@@ -8,78 +7,60 @@ import {
   TouchableOpacity,
   StyleSheet as RNStyleSheet,
 } from "react-native";
-import { Buffer } from "buffer"; // base64 fallback
+import { Buffer } from "buffer";
 
 /** ---------- helpers ---------- */
-
 const FIRST_VALUE = (obj, keys) =>
   keys.map((k) => obj?.[k]).find((v) => v !== undefined && v !== null);
 
-/** decodeURIComponent safely */
-function safeDecode(s) {
+const safeDecode = (s) => {
   try {
     return decodeURIComponent(s);
   } catch {
     return s;
   }
-}
+};
 
-/** try base64 (normal or URL-safe) */
 function tryBase64Decode(s) {
   if (!s || typeof s !== "string") return null;
   const clean = s
     .trim()
-    .replace(/^data:.*?;base64,/, "") // data URI
+    .replace(/^data:.*?;base64,/, "")
     .replace(/[\r\n\s]+/g, "")
     .replace(/-/g, "+")
-    .replace(/_/g, "/"); // url-safe -> std
+    .replace(/_/g, "/");
   try {
-    // atob may not exist on RN; Buffer is reliable
     return Buffer.from(clean, "base64").toString("utf8");
   } catch {
     return null;
   }
 }
 
-/** JSON.parse with a few common encodings */
 function tryParse(jsonish) {
   if (jsonish == null) return null;
-
-  // Already an object?
   if (typeof jsonish === "object") return jsonish;
-
   const s = String(jsonish).trim();
   if (!s) return null;
-
-  // direct JSON
   try {
     return JSON.parse(s);
   } catch {}
-
-  // URI-decoded JSON (1–2 times)
   for (let i = 0; i < 2; i++) {
     try {
       return JSON.parse(safeDecode(i ? safeDecode(s) : s));
     } catch {}
   }
-
-  // base64 -> JSON
   const b64 = tryBase64Decode(s);
   if (b64) {
     try {
       return JSON.parse(b64);
     } catch {}
   }
-
   return null;
 }
 
-/** Read ?data=/ ?payload=/ ?p= from a URL-like string (encoded, base64, etc.) */
 function parseFromUrlString(raw) {
   const s = (raw || "").trim();
   if (!s) return null;
-
-  // Use URL API if possible
   if (s.includes("://") || s.startsWith("http") || s.startsWith("myapp://")) {
     try {
       const u = new URL(s);
@@ -92,8 +73,6 @@ function parseFromUrlString(raw) {
       }
     } catch {}
   }
-
-  // Fallback regex
   const m = s.match(/[?&](?:data|payload|p)=([^&#]+)/i);
   if (m?.[1]) {
     const val = m[1];
@@ -103,14 +82,11 @@ function parseFromUrlString(raw) {
       tryParse(tryBase64Decode(val))
     );
   }
-
   return null;
 }
 
-/** Pull a plausible assetId from object/string/URL */
 function getAssetIdFrom(anything) {
   if (!anything) return null;
-
   if (typeof anything === "object") {
     return (
       anything.assetId ||
@@ -120,25 +96,16 @@ function getAssetIdFrom(anything) {
       null
     );
   }
-
   const s = String(anything);
-
-  // query param
   const q = s.match(/[?&](?:assetId|asset_id|id|code)=([^&#]+)/i);
   if (q?.[1]) return safeDecode(q[1]);
-
-  // path tail …/assets/<id> or …/<id>
   const last = s.split(/[?#]/)[0].split("/").filter(Boolean).pop();
-  if (last && /^[\w-]{3,}$/.test(last)) return last;
-
+  if (last && last.length) return last;
   return null;
 }
 
-/** Try to extract details from many shapes (web-parity) */
 function extractDetailsFromRoute(route) {
   const p = route?.params || {};
-
-  // Common param names that scanners/deep-links use
   const rawCandidate =
     FIRST_VALUE(p, [
       "data",
@@ -153,37 +120,34 @@ function extractDetailsFromRoute(route) {
       "link",
     ]) || "";
 
-  // 1) If an object was passed directly
-  if (typeof rawCandidate === "object") {
-    return rawCandidate;
-  }
+  if (typeof rawCandidate === "object") return rawCandidate;
 
   const raw = String(rawCandidate);
-
-  // 2) direct JSON / uri-decoded / base64
   const objDirect = tryParse(raw);
   if (objDirect) return objDirect;
 
-  // 3) URL with ?data= / ?payload= / ?p=
   const objFromUrl = parseFromUrlString(raw);
   if (objFromUrl) return objFromUrl;
 
-  // 4) Sometimes the whole route.params itself carries the fields
   const objFromParams = tryParse(p);
   if (objFromParams) return objFromParams;
 
-  // 5) Last resort: build minimal details from an id we can find
   const id = getAssetIdFrom(raw) || getAssetIdFrom(p) || null;
-
   return id ? { assetId: id } : null;
 }
 
 /** ---------- screen ---------- */
-
 export default function QRDetailsScreen({ route, navigation }) {
   const assetDetails = extractDetailsFromRoute(route);
   const assetId =
     getAssetIdFrom(assetDetails) || getAssetIdFrom(route?.params) || null;
+
+  // If only assetId present, jump to AssetDetails to fetch real data
+  useEffect(() => {
+    if (assetId && (!assetDetails || Object.keys(assetDetails).length <= 2)) {
+      navigation.replace("AssetDetails", { assetId, fromQR: true });
+    }
+  }, [assetId, assetDetails, navigation]);
 
   if (!assetDetails) {
     return (
@@ -282,45 +246,6 @@ export default function QRDetailsScreen({ route, navigation }) {
                 <Text style={styles.additionalValue}>{it?.value ?? "N/A"}</Text>
               </View>
             ))}
-          </View>
-
-          {/* Specifications */}
-          {!!assetDetails.specifications &&
-            typeof assetDetails.specifications === "object" && (
-              <View style={styles.additionalBox}>
-                <Text style={styles.additionalTitle}>Specifications</Text>
-                {Object.entries(assetDetails.specifications).map(([k, v]) => (
-                  <View key={k} style={styles.additionalRow}>
-                    <Text style={styles.additionalLabel}>
-                      {k.replace(/([A-Z])/g, " $1")}:
-                    </Text>
-                    <Text style={styles.additionalValue}>{String(v)}</Text>
-                  </View>
-                ))}
-              </View>
-            )}
-
-          {/* Actions */}
-          <View style={styles.actionsRow}>
-            <TouchableOpacity
-              onPress={() =>
-                navigation.navigate("TransferAsset", { assetId, assetDetails })
-              }
-              style={[styles.btn, styles.btnPrimary]}
-            >
-              <Text style={styles.btnText}>Transfer Asset</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              onPress={() =>
-                navigation.navigate("MaintenanceRequests", {
-                  assetId,
-                  assetDetails,
-                })
-              }
-              style={[styles.btn, styles.btnOutline]}
-            >
-              <Text style={styles.btnOutlineText}>Maintenance</Text>
-            </TouchableOpacity>
           </View>
         </View>
       </View>
@@ -427,29 +352,6 @@ const styles = RNStyleSheet.create({
   },
   additionalLabel: { color: COLORS.textMuted, fontSize: 13 },
   additionalValue: { fontWeight: "700", color: COLORS.text, fontSize: 13 },
-
-  actionsRow: { flexDirection: "row", columnGap: 12, marginTop: 16 },
-  btn: {
-    flex: 1,
-    paddingVertical: 12,
-    borderRadius: 12,
-    alignItems: "center",
-    justifyContent: "center",
-    minHeight: 48,
-  },
-  btnPrimary: { backgroundColor: COLORS.primary, ...SHADOWS.md },
-  btnOutline: {
-    backgroundColor: COLORS.surface,
-    borderWidth: 1,
-    borderColor: COLORS.primary,
-    ...SHADOWS.sm,
-  },
-  btnText: { color: "#fff", fontWeight: "800", letterSpacing: 0.3 },
-  btnOutlineText: {
-    color: COLORS.primary,
-    fontWeight: "800",
-    letterSpacing: 0.3,
-  },
 
   invalidWrap: {
     flex: 1,

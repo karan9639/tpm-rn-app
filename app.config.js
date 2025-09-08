@@ -6,7 +6,7 @@ export default () => ({
     scheme: "tpm",
     version: "1.0.1",
 
-    // iOS + legacy Android
+    // iOS + legacy Android icons
     icon: "./assets/icon.png",
 
     orientation: "portrait",
@@ -23,6 +23,12 @@ export default () => ({
       supportsTablet: false,
       bundleIdentifier: "com.k2p.tpm",
       icon: "./assets/icon.png",
+      // ✅ REQUIRED for camera on iOS
+      infoPlist: {
+        NSCameraUsageDescription: "Scan QR codes for assets.",
+      },
+      // (Optional) bump when you submit to TestFlight
+      buildNumber: "2",
     },
 
     android: {
@@ -30,14 +36,18 @@ export default () => ({
       versionCode: 2, // bump when rebuilding
       icon: "./assets/icon.png", // legacy fallback
       adaptiveIcon: {
-        foregroundImage: "./assets/adaptive-icon.png", // transparent-only logo
+        foregroundImage: "./assets/adaptive-icon.png",
         backgroundColor: "#0F172A",
-        monochromeImage: "./assets/adaptive-icon-monochrome.png", // optional but nice
+        monochromeImage: "./assets/adaptive-icon-monochrome.png",
       },
-      permissions: [],
+      // ✅ DO NOT leave this empty — this is the fix
+      permissions: ["CAMERA"],
     },
 
-    web: { bundler: "metro", favicon: "./assets/icon.png" },
+    web: {
+      bundler: "metro",
+      favicon: "./assets/icon.png",
+    },
 
     extra: {
       eas: { projectId: "8c62cd08-341d-4742-b004-79afff07d3cd" },
