@@ -305,6 +305,11 @@ const MaintenanceRequestCard = ({
       <Text style={styles.kv}>
         <Text style={styles.k}>Location: </Text>
         <Text style={styles.v}>
+          {assetDetails?.locationCode ||
+            assetDetails?.location?.locationCode ||
+            request.asset?.[0]?.location?.[0]?.locationCode ||
+            "N/A"}{" "}
+          -{" "}
           {assetDetails?.locationName ||
             assetDetails?.location?.locationName ||
             request.asset?.[0]?.location?.[0]?.locationName ||
