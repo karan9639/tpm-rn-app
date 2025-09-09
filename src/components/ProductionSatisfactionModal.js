@@ -23,7 +23,8 @@ export default function ProductionSatisfactionModal({
 }) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [satisfaction, setSatisfaction] = useState(""); // "Yes" | "No"
-  const [remark, setRemark] = useState("");
+  // 🔁 remark -> acknowledgement (string)
+  const [acknowledgement, setAcknowledgement] = useState("");
   const [errors, setErrors] = useState({});
 
   // Support any of your service exports
@@ -36,8 +37,8 @@ export default function ProductionSatisfactionModal({
   const validate = () => {
     const next = {};
     if (!satisfaction) next.satisfaction = "Please select Yes or No";
-    if (satisfaction === "No" && !remark.trim())
-      next.remark = "Remark is required when selecting No";
+    if (satisfaction === "No" && !acknowledgement.trim())
+      next.acknowledgement = "Acknowledgement is required when selecting No";
     if (!assetId) next.submit = "Asset ID not found.";
     setErrors(next);
     return Object.keys(next).length === 0;
@@ -50,11 +51,13 @@ export default function ProductionSatisfactionModal({
       setIsSubmitting(true);
       setErrors({});
 
-      // ✅ Backend requires `acknowledgement`
+      // ✅ Desired payload:
+      // { "isProductionSatisfiedByMechanic": "No", "acknowledgement": "OKAY KARAN FIXED" }
       const payload = {
-        acknowledgement: satisfaction === "Yes", // boolean
-        isProductionSatisfiedByMechanic: satisfaction, // keep the human label if backend uses it
-        ...(satisfaction === "No" ? { remark: remark.trim() } : {}), // omit when "Yes"
+        isProductionSatisfiedByMechanic: satisfaction, // "Yes" | "No"
+        ...(satisfaction === "No"
+          ? { acknowledgement: acknowledgement.trim() }
+          : {}), // include only when "No"
       };
 
       if (!submitFn) {
@@ -84,7 +87,7 @@ export default function ProductionSatisfactionModal({
 
   const handleClose = () => {
     setSatisfaction("");
-    setRemark("");
+    setAcknowledgement("");
     setErrors({});
     onClose?.();
   };
@@ -116,8 +119,12 @@ export default function ProductionSatisfactionModal({
               style={styles.radioRow}
               onPress={() => {
                 setSatisfaction("Yes");
-                setRemark("");
-                setErrors((e) => ({ ...e, satisfaction: "", remark: "" }));
+                setAcknowledgement("");
+                setErrors((e) => ({
+                  ...e,
+                  satisfaction: "",
+                  acknowledgement: "",
+                }));
               }}
               disabled={isSubmitting}
             >
@@ -151,27 +158,27 @@ export default function ProductionSatisfactionModal({
             <Text style={styles.errorText}>{errors.satisfaction}</Text>
           )}
 
-          {/* Remark when No */}
+          {/* Acknowledgement when No */}
           {satisfaction === "No" && (
             <View style={{ marginTop: 12 }}>
-              <Text style={styles.label}>Remark *</Text>
+              <Text style={styles.label}>Acknowledgement *</Text>
               <TextInput
                 style={[
                   styles.input,
-                  !!errors.remark && { borderColor: "#EF4444" },
+                  !!errors.acknowledgement && { borderColor: "#EF4444" },
                 ]}
-                placeholder="Please explain why the machine is not working properly..."
-                value={remark}
+                placeholder="Add acknowledgement / reason / action taken..."
+                value={acknowledgement}
                 onChangeText={(t) => {
-                  setRemark(t);
-                  setErrors((e) => ({ ...e, remark: "" }));
+                  setAcknowledgement(t);
+                  setErrors((e) => ({ ...e, acknowledgement: "" }));
                 }}
                 multiline
                 numberOfLines={3}
                 editable={!isSubmitting}
               />
-              {!!errors.remark && (
-                <Text style={styles.errorText}>{errors.remark}</Text>
+              {!!errors.acknowledgement && (
+                <Text style={styles.errorText}>{errors.acknowledgement}</Text>
               )}
             </View>
           )}
