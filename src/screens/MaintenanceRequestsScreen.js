@@ -54,6 +54,11 @@ const normalizeAllRequestsData = (data) =>
           locationName: item?.assetId?.location?.locationName || "N/A",
           locationCode: item?.assetId?.location?.locationCode || "N/A",
           underMaintenance: item?.assetId?.underMaintenance || false,
+          // ✅ critical: copy production-satisfaction flags too
+          isProductionSatisfiedByMechanic:
+            item?.assetId?.isProductionSatisfiedByMechanic ?? false,
+          isProductionSatisfiedPopupVisible:
+            item?.assetId?.isProductionSatisfiedPopupVisible ?? false,
         },
         mechanicDetails: null,
         creatorDetails: item?.assetMaintenanceRequestCreator,
@@ -215,27 +220,40 @@ const MaintenanceRequestCard = ({
 
   // Pull production-satisfaction flags regardless of shape
   const getProductionSatisfactionStatus = () => {
-    const assetData =
-      request?.assetDetails ??
-      request?.asset?.[0] ??
-      request?.assetMaintenanceRequestDetails?.[0]?.assetDetails?.[0] ??
-      request?.assetId ??
-      null;
+  const pickBool = (...vals) => {
+    for (const v of vals) if (typeof v === "boolean") return v;
+    return false;
+  };
 
-    if (!assetData) {
-      return {
-        showButton: false,
-        isProductionSatisfied: false,
-        assetId: null,
-        assetName: null,
-      };
-    }
-    return {
-      showButton: assetData.isProductionSatisfiedPopupVisible === true,
-      isProductionSatisfied: assetData.isProductionSatisfiedByMechanic === true,
-      assetId: assetData?._id || null,
-      assetName: assetData?.assetName || null,
-    };
+  const a1 = request?.assetDetails;
+  const a2 = request?.asset?.[0];
+  const a3 = request?.assetMaintenanceRequestDetails?.[0]?.assetDetails?.[0];
+  const a4 =
+    request?.assetId && typeof request.assetId === "object"
+      ? request.assetId
+      : undefined;
+
+  const isProductionSatisfied = pickBool(
+    a1?.isProductionSatisfiedByMechanic,
+    a2?.isProductionSatisfiedByMechanic,
+    a3?.isProductionSatisfiedByMechanic,
+    a4?.isProductionSatisfiedByMechanic
+  );
+
+  const showButton = pickBool(
+    a1?.isProductionSatisfiedPopupVisible,
+    a2?.isProductionSatisfiedPopupVisible,
+    a3?.isProductionSatisfiedPopupVisible,
+    a4?.isProductionSatisfiedPopupVisible
+  );
+
+  const resolved = a1 || a2 || a3 || a4 || {};
+  return {
+    showButton,
+    isProductionSatisfied,
+    assetId: resolved?._id || null,
+    assetName: resolved?.assetName || null,
+  };
   };
 
   const {
