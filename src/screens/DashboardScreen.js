@@ -207,19 +207,19 @@ useLayoutEffect(() => {
         bgColor: "#eef2ff",
         borderColor: "#c7d2fe",
       },
-      {
-        title: `Breakdown Maintenance - ${
-          loadingCounts ? "…" : counts.breakdownMaintenance
-        }`,
-        description: `You have ${
-          loadingCounts ? "…" : counts.breakdownMaintenance
-        } Breakdowns Left.`,
-        iconName: "alert-octagon-outline",
-        iconColor: "#f59e0b",
-        iconBg: "#ffffff",
-        bgColor: "#fff7ed",
-        borderColor: "#fed7aa",
-      },
+      // {
+      //   title: `Breakdown Maintenance - ${
+      //     loadingCounts ? "…" : counts.breakdownMaintenance
+      //   }`,
+      //   description: `You have ${
+      //     loadingCounts ? "…" : counts.breakdownMaintenance
+      //   } Breakdowns Left.`,
+      //   iconName: "alert-octagon-outline",
+      //   iconColor: "#f59e0b",
+      //   iconBg: "#ffffff",
+      //   bgColor: "#fff7ed",
+      //   borderColor: "#fed7aa",
+      // },
       {
         title: `Under Maintenance - ${
           loadingCounts ? "…" : counts.underMaintenance
