@@ -1,5 +1,5 @@
 // src/screens/AcknowledgementsScreen.js
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   View,
   Text,
@@ -8,12 +8,16 @@ import {
   TouchableOpacity,
   StyleSheet,
 } from "react-native";
-import * as api from "../services/api";
 import { Feather } from "@expo/vector-icons";
+import { useAuth } from "../context/AuthContext";
+import { maintenanceAPI, assetAPI, userAPI } from "../services/api";
 
 const cap = (s) =>
   s ? s.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()) : "—";
 
+/* --------------------------
+   Status / Chips for UI
+--------------------------- */
 const StatusChip = ({ status }) => {
   const s = (status || "").toLowerCase();
   const map = {
@@ -28,7 +32,6 @@ const StatusChip = ({ status }) => {
       fg: "#C2410C",
       icon: "loader",
       label: "In Progress",
-      spin: true,
     },
   };
   const c = map[s] || {
@@ -37,13 +40,14 @@ const StatusChip = ({ status }) => {
     icon: "tool",
     label: cap(s || "status"),
   };
+
   return (
     <View style={[styles.statusPill, { backgroundColor: c.bg }]}>
       <Feather
         name={c.icon}
         size={14}
         color={c.fg}
-        style={c.spin ? { marginRight: 6 } : { marginRight: 6 }}
+        style={{ marginRight: 6 }}
       />
       <Text style={{ color: c.fg, fontWeight: "700", fontSize: 12 }}>
         {c.label}
@@ -52,7 +56,49 @@ const StatusChip = ({ status }) => {
   );
 };
 
-const DetailRow = ({ icon, label, value }) => (
+const prodChipFromAck = (ackStr) => {
+  const val = String(ackStr || "")
+    .trim()
+    .toLowerCase();
+  if (!val)
+    return {
+      bg: "#E0F2FE",
+      fg: "#075985",
+      icon: "tool",
+      label: "Acknowledgement",
+    };
+  if (val === "false")
+    return {
+      bg: "#FEE2E2",
+      fg: "#991B1B",
+      icon: "alert-triangle",
+      label: "Not Acknowledged",
+    };
+  if (val.includes("recheck"))
+    return {
+      bg: "#FFEDD5",
+      fg: "#9A3412",
+      icon: "alert-triangle",
+      label: "Recheck Requested",
+    };
+  return { bg: "#DBEAFE", fg: "#1E3A8A", icon: "check", label: cap(val) };
+};
+
+const Pill = ({ chip }) => (
+  <View style={[styles.statusPill, { backgroundColor: chip.bg }]}>
+    <Feather
+      name={chip.icon}
+      size={14}
+      color={chip.fg}
+      style={{ marginRight: 6 }}
+    />
+    <Text style={{ color: chip.fg, fontWeight: "700", fontSize: 12 }}>
+      {chip.label}
+    </Text>
+  </View>
+);
+
+const Row = ({ icon, label, value }) => (
   <View
     style={{
       flexDirection: "row",
@@ -73,48 +119,44 @@ const DetailRow = ({ icon, label, value }) => (
   </View>
 );
 
-const AckCard = ({ ack }) => {
-  const spareParts =
+/* --------------------------
+   Cards
+--------------------------- */
+const SupervisorAckCard = ({ ack, assetName, creatorName }) => {
+  const spares =
     Array.isArray(ack?.assetSpareId) && ack.assetSpareId.length > 0
       ? ack.assetSpareId.map((p) => p?.assetSpareName || p?._id).join(", ")
       : "N/A";
 
   return (
     <View style={styles.card}>
-      <View
-        style={{
-          flexDirection: "row",
-          justifyContent: "space-between",
-          alignItems: "center",
-          paddingBottom: 8,
-          borderBottomWidth: StyleSheet.hairlineWidth,
-          borderBottomColor: "#F3F4F6",
-        }}
-      >
-        <Text style={{ fontWeight: "700", color: "#111827" }}>
-          Acknowledgement Details
-        </Text>
+      {/* Header */}
+      <View style={styles.cardHeader}>
+        <Text style={styles.cardTitle}>Acknowledgement Details</Text>
         <StatusChip status={ack?.status} />
       </View>
 
-      <View style={{ paddingTop: 8 }}>
-        <DetailRow
-          icon="message-circle"
-          label="Remark"
-          value={ack?.remark || "—"}
-        />
-        <DetailRow
+      {/* Meta */}
+      <Row icon="cpu" label="Asset" value={assetName || "—"} />
+      {!!creatorName && (
+        <Row icon="user" label="Created By" value={creatorName} />
+      )}
+
+      {/* Details */}
+      <View style={{ paddingTop: 2 }}>
+        <Row icon="message-circle" label="Remark" value={ack?.remark || "—"} />
+        <Row
           icon="message-square"
           label="Comment"
           value={ack?.comment || "No comment provided"}
         />
-        <DetailRow icon="tag" label="Spare Parts Used" value={spareParts} />
-        <DetailRow
+        <Row icon="tag" label="Spare Parts Used" value={spares} />
+        <Row
           icon="info"
           label="Acknowledgement ID"
           value={ack?.acknowledgementId || "—"}
         />
-        <DetailRow
+        <Row
           icon="calendar"
           label="Date"
           value={
@@ -126,8 +168,52 @@ const AckCard = ({ ack }) => {
   );
 };
 
+const ProductionAckCard = ({ ack, assetName, creatorName }) => {
+  const chip = prodChipFromAck(ack?.acknowledgement);
+  return (
+    <View style={styles.card}>
+      {/* Header */}
+      <View style={styles.cardHeader}>
+        <Text style={styles.cardTitle}>Production Acknowledgement</Text>
+        {/* <Pill chip={chip} /> */}
+      </View>
+
+      {/* Meta */}
+      <Row icon="cpu" label="Asset" value={assetName || "—"} />
+      {!!creatorName && (
+        <Row icon="user" label="Created By" value={creatorName} />
+      )}
+
+      {/* Details */}
+      <View style={{ paddingTop: 2 }}>
+        <Row
+          icon="info"
+          label="Acknowledgement"
+          value={ack?.acknowledgement || "—"}
+        />
+        <Row
+          icon="calendar"
+          label="Date"
+          value={
+            ack?.createdAt ? new Date(ack.createdAt).toLocaleString() : "—"
+          }
+        />
+      </View>
+    </View>
+  );
+};
+
+/* --------------------------
+   Screen
+--------------------------- */
 export default function AcknowledgementsScreen({ route, navigation }) {
   const assetId = route?.params?.assetId;
+  const { user } = useAuth();
+  const role = useMemo(
+    () => (user?.accountType || user?.role || "").toLowerCase(),
+    [user]
+  );
+
   const [loading, setLoading] = useState(true);
   const [items, setItems] = useState([]);
   const [error, setError] = useState("");
@@ -135,6 +221,66 @@ export default function AcknowledgementsScreen({ route, navigation }) {
   useEffect(() => {
     navigation?.setOptions?.({ title: "Acknowledgements" });
   }, [navigation]);
+
+  const hydrateNames = useCallback(async (list) => {
+    // collect unique ids
+    const assetIds = new Set();
+    const creatorIds = new Set();
+
+    list.forEach((it) => {
+      if (it?.assetId) assetIds.add(it.assetId);
+      const creatorId =
+        it?.productionAcknowledgementCreator ||
+        it?.assetMaintenanceRequestCreator ||
+        it?.createdBy ||
+        it?.creator;
+      if (creatorId) creatorIds.add(creatorId);
+    });
+
+    // fetch employees once
+    const employeesResp = await userAPI.getAllEmployees().catch(() => null);
+    const employees = employeesResp?.data || employeesResp || [];
+    const empMap = new Map(
+      employees.map((e) => [
+        e?._id,
+        e?.fullName ||
+          e?.name ||
+          [e?.firstName, e?.lastName].filter(Boolean).join(" ") ||
+          e?._id ||
+          "—",
+      ])
+    );
+
+    // fetch each asset detail (no batch endpoint, so fan out)
+    const assetPairs = await Promise.all(
+      [...assetIds].map(async (id) => {
+        try {
+          const r = await assetAPI.getAssetById(id);
+          const data = r?.data || r;
+          const name =
+            data?.assetName || data?.asset?.assetName || data?.name || id;
+          return [id, name];
+        } catch {
+          return [id, id];
+        }
+      })
+    );
+    const assetMap = new Map(assetPairs);
+
+    // attach friendly names
+    return list.map((it) => {
+      const creatorId =
+        it?.productionAcknowledgementCreator ||
+        it?.assetMaintenanceRequestCreator ||
+        it?.createdBy ||
+        it?.creator;
+      return {
+        ...it,
+        __assetName: assetMap.get(it?.assetId) || it?.assetId || "—",
+        __creatorName: creatorId ? empMap.get(creatorId) || creatorId : "",
+      };
+    });
+  }, []);
 
   const fetchData = useCallback(async () => {
     if (!assetId) {
@@ -144,20 +290,49 @@ export default function AcknowledgementsScreen({ route, navigation }) {
     }
     setLoading(true);
     setError("");
+
     try {
-      const resp = await api.get_acknowledgements(assetId);
-      setItems(Array.isArray(resp?.data) ? resp.data : []);
+      const useProductionAPI = role === "production" || role === "mechanic";
+      const resp = useProductionAPI
+        ? await maintenanceAPI.getProductionSatisfactionByAssetId(assetId)
+        : await maintenanceAPI.getAcknowledgementsByAssetId(assetId);
+
+      const raw = Array.isArray(resp?.data) ? resp.data : [];
+      const hydrated = await hydrateNames(raw);
+      setItems(hydrated);
     } catch (e) {
       setError(e?.message || "Failed to load acknowledgements.");
       setItems([]);
     } finally {
       setLoading(false);
     }
-  }, [assetId]);
+  }, [assetId, role, hydrateNames]);
 
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  const renderItem = ({ item }) => {
+    // detect shape: supervisor vs production
+    const looksSupervisor =
+      item?.status !== undefined ||
+      item?.remark !== undefined ||
+      Array.isArray(item?.assetSpareId);
+
+    return looksSupervisor ? (
+      <SupervisorAckCard
+        ack={item}
+        assetName={item.__assetName}
+        creatorName={item.__creatorName}
+      />
+    ) : (
+      <ProductionAckCard
+        ack={item}
+        assetName={item.__assetName}
+        creatorName={item.__creatorName}
+      />
+    );
+  };
 
   if (loading) {
     return (
@@ -191,9 +366,11 @@ export default function AcknowledgementsScreen({ route, navigation }) {
   return (
     <FlatList
       data={items}
-      keyExtractor={(it, idx) => it?._id || String(idx)}
+      keyExtractor={(it, idx) =>
+        it?._id || it?.acknowledgementId || String(idx)
+      }
       contentContainerStyle={{ padding: 12 }}
-      renderItem={({ item }) => <AckCard ack={item} />}
+      renderItem={renderItem}
       ListEmptyComponent={
         <View style={[styles.center, { padding: 24 }]}>
           <View
@@ -223,19 +400,35 @@ export default function AcknowledgementsScreen({ route, navigation }) {
   );
 }
 
+/* --------------------------
+   Styles
+--------------------------- */
 const styles = StyleSheet.create({
   center: { flex: 1, alignItems: "center", justifyContent: "center" },
+
   card: {
     backgroundColor: "#fff",
-    borderRadius: 12,
+    borderRadius: 14,
     padding: 12,
-    marginBottom: 10,
-    elevation: 2,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: "#e5e7eb",
     shadowColor: "#000",
     shadowOpacity: 0.06,
-    shadowOffset: { width: 0, height: 1 },
-    shadowRadius: 2,
+    shadowOffset: { width: 0, height: 2 },
+    shadowRadius: 6,
+    elevation: 2,
   },
+  cardHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingBottom: 8,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: "#F3F4F6",
+  },
+  cardTitle: { fontWeight: "800", color: "#111827" },
+
   statusPill: {
     flexDirection: "row",
     alignItems: "center",
@@ -243,6 +436,7 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     borderRadius: 999,
   },
+
   tryBtn: {
     backgroundColor: "#2563EB",
     paddingHorizontal: 16,

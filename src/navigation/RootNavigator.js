@@ -1,3 +1,4 @@
+// navigation/RootNavigator.tsx (or .js)
 import React from "react";
 import { ActivityIndicator, View } from "react-native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
@@ -18,14 +19,21 @@ import QRDetailsScreen from "../screens/QRDetailsScreen";
 
 const Stack = createNativeStackNavigator();
 
-const RoleBasedGuard = ({ allowedRoles, children }) => {
+const getRole = (user) =>
+  String(user?.accountType || user?.role || user?.userRole || "")
+    .trim()
+    .toLowerCase();
+
+const RoleBasedGuard = ({
+  allowedRoles = [],
+  children,
+}) => {
   const { user } = useAuth();
-  const role = (user?.role || "").toLowerCase();
-  return allowedRoles.map((r) => r.toLowerCase()).includes(role) ? (
-    children
-  ) : (
-    <UnauthorizedScreen />
-  );
+  const role = getRole(user);
+  const allowed =
+    allowedRoles.length === 0 ||
+    allowedRoles.map((r) => r.toLowerCase()).includes(role);
+  return allowed ? <>{children}</> : <UnauthorizedScreen />;
 };
 
 export default function RootNavigator() {
@@ -40,7 +48,11 @@ export default function RootNavigator() {
   }
 
   return (
-    <Stack.Navigator screenOptions={{ headerTitleAlign: "center" }}>
+    <Stack.Navigator
+      screenOptions={{
+        headerTitleAlign: "center",
+      }}
+    >
       {!isAuthenticated ? (
         <Stack.Screen
           name="Login"
@@ -54,18 +66,20 @@ export default function RootNavigator() {
             component={DashboardScreen}
             options={{ title: "Dashboard" }}
           />
+
           <Stack.Screen
             name="Assets"
             component={AssetScreen}
             options={{ title: "Assets" }}
           />
+
           <Stack.Screen
             name="AssetDetails"
             component={AssetDetailsScreen}
             options={{ title: "Asset Details" }}
           />
 
-          {/* Transfer -> production + supervisor */}
+          {/* Transfer -> production + supervisor (matches web) */}
           <Stack.Screen
             name="TransferAsset"
             options={{ title: "Transfer Asset" }}
@@ -82,13 +96,14 @@ export default function RootNavigator() {
             component={RequestMaintenanceScreen}
             options={{ title: "Request Maintenance" }}
           />
+
           <Stack.Screen
             name="MaintenanceRequests"
             component={MaintenanceRequestsScreen}
             options={{ title: "Maintenance Requests" }}
           />
 
-          {/* Update Process -> mechanic only */}
+          {/* Update Process -> mechanic only (matches web) */}
           <Stack.Screen
             name="UpdateProcess"
             options={{ title: "Update Process" }}
@@ -100,13 +115,15 @@ export default function RootNavigator() {
             )}
           </Stack.Screen>
 
-          {/* Acknowledgements -> supervisor only */}
+          {/* Acknowledgements -> supervisor + production + mechanic (matches web change) */}
           <Stack.Screen
             name="Acknowledgements"
             options={{ title: "Acknowledgements" }}
           >
             {(props) => (
-              <RoleBasedGuard allowedRoles={["supervisor"]}>
+              <RoleBasedGuard
+                allowedRoles={["supervisor", "production", "mechanic"]}
+              >
                 <AcknowledgementsScreen {...props} />
               </RoleBasedGuard>
             )}

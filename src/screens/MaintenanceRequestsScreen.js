@@ -1,4 +1,3 @@
-// src/screens/MaintenanceRequestsScreen.js
 import React, {
   useEffect,
   useMemo,
@@ -130,7 +129,12 @@ const normalizeRequestData = (data, userRole) =>
             remark: item?.remark || item?.description || "No remarks",
             assetDetails: asset0
               ? { ...asset0, locationName, locationCode }
-              : { assetName: "N/A", assetCode: "N/A", locationName: "N/A", locationCode: "N/A" },
+              : {
+                  assetName: "N/A",
+                  assetCode: "N/A",
+                  locationName: "N/A",
+                  locationCode: "N/A",
+                },
             mechanicDetails: mechanic,
           };
         }
@@ -196,6 +200,9 @@ const StatusChip = ({ status }) => {
 /* -----------------------------------------------
    Card – mirrors web card + production modal
 ------------------------------------------------- */
+/* -----------------------------------------------
+   Card – mirrors web card + production modal
+------------------------------------------------- */
 const MaintenanceRequestCard = ({
   request,
   userRole,
@@ -204,7 +211,7 @@ const MaintenanceRequestCard = ({
 }) => {
   const [isCompleting, setIsCompleting] = useState(false);
   const [assignOpen, setAssignOpen] = useState(false);
-  const [prodOpen, setProdOpen] = useState(false); // modal open state
+  const [prodOpen, setProdOpen] = useState(false);
 
   // Pull production-satisfaction flags regardless of shape
   const getProductionSatisfactionStatus = () => {
@@ -243,19 +250,19 @@ const MaintenanceRequestCard = ({
   const isCompleted =
     request.status === "completed" || request.isActive === false;
 
+  // ✅ same behavior as web: show button if we have an asset id
+  const resolvedAssetId = assetDetails?._id || assetId;
+  const canViewAcknowledgements = !!resolvedAssetId;
+
   const handleMaintenanceDone = async () => {
-    if (!assetDetails?._id && !assetId) {
+    const id = resolvedAssetId;
+    if (!id) {
       Alert.alert("Error", "Asset ID not found. Cannot complete maintenance.");
       return;
     }
     try {
       setIsCompleting(true);
-      const id = assetDetails?._id || assetId;
-      if (api.closeMaintenanceRequest) await api.closeMaintenanceRequest(id);
-      else if (api.close_maintenance_request)
-        await api.close_maintenance_request(id);
-      else if (api.maintenanceAPI?.closeMaintenanceRequest)
-        await api.maintenanceAPI.closeMaintenanceRequest(id);
+      await api.maintenanceAPI.closeMaintenanceRequest(id);
       Alert.alert("Success", "Maintenance request completed successfully!");
       onRefresh?.();
     } catch (e) {
@@ -265,13 +272,11 @@ const MaintenanceRequestCard = ({
     }
   };
 
-  // inside MaintenanceRequestCard in MaintenanceRequestsScreen.js
-
   const handleStartTask = () => {
     navigation.navigate("QRScan", {
-      allowScan: true, // ✅ lets mechanics in
+      allowScan: true,
       next: {
-        screen: "UpdateProcess", // where to go after a successful scan
+        screen: "UpdateProcess",
         params: { requestId: request._id, request },
       },
     });
@@ -316,15 +321,15 @@ const MaintenanceRequestCard = ({
       <Text style={styles.kv}>
         <Text style={styles.k}>Location: </Text>
         <Text style={styles.v}>
-          {assetDetails?.locationCode ||
+          {(assetDetails?.locationCode ||
             assetDetails?.location?.locationCode ||
             request.asset?.[0]?.location?.[0]?.locationCode ||
-            "N/A"}{" "}
-          -{" "}
-          {assetDetails?.locationName ||
-            assetDetails?.location?.locationName ||
-            request.asset?.[0]?.location?.[0]?.locationName ||
-            "N/A"}
+            "N/A") +
+            " - " +
+            (assetDetails?.locationName ||
+              assetDetails?.location?.locationName ||
+              request.asset?.[0]?.location?.[0]?.locationName ||
+              "N/A")}
         </Text>
       </Text>
       {!!request.remark && (
@@ -351,9 +356,9 @@ const MaintenanceRequestCard = ({
       )}
 
       {/* Actions by role */}
-      {userRole === "production" && !isCompleted && isAssigned && (
-        <>
-          {showProductionSatisfactionButton && (
+      {userRole === "production" && (
+        <View>
+          {!isCompleted && isAssigned && showProductionSatisfactionButton && (
             <TouchableOpacity
               style={styles.btnSecondaryBlue}
               onPress={() => setProdOpen(true)}
@@ -361,7 +366,23 @@ const MaintenanceRequestCard = ({
               <Text style={styles.btnSecondaryBlueText}>Machine Working</Text>
             </TouchableOpacity>
           )}
-        </>
+
+          {/* ✅ ALWAYS show for production if we have an asset id */}
+          {canViewAcknowledgements && (
+            <TouchableOpacity
+              style={styles.btnSecondaryPurple}
+              onPress={() =>
+                navigation?.navigate?.("Acknowledgements", {
+                  assetId: resolvedAssetId,
+                })
+              }
+            >
+              <Text style={styles.btnSecondaryPurpleText}>
+                View Acknowledgements
+              </Text>
+            </TouchableOpacity>
+          )}
+        </View>
       )}
 
       {userRole === "supervisor" && (
@@ -398,12 +419,13 @@ const MaintenanceRequestCard = ({
             </>
           )}
 
-          {!!acknowledgementId && (
+          {/* ✅ supervisor also gets the button, not tied to acknowledgementId */}
+          {canViewAcknowledgements && (
             <TouchableOpacity
               style={styles.btnSecondaryPurple}
               onPress={() =>
                 navigation?.navigate?.("Acknowledgements", {
-                  assetId: assetDetails?._id || assetId,
+                  assetId: resolvedAssetId,
                 })
               }
             >
@@ -415,26 +437,46 @@ const MaintenanceRequestCard = ({
         </View>
       )}
 
-      {userRole === "mechanic" && !isCompleted && (
+      {userRole === "mechanic" && (
         <View>
-          {acknowledgementId ? (
+          {!isCompleted && (
+            <>
+              {acknowledgementId ? (
+                <TouchableOpacity
+                  style={styles.btnSecondary}
+                  onPress={() =>
+                    navigation.navigate("UpdateProcess", {
+                      requestId: request._id,
+                      request,
+                    })
+                  }
+                >
+                  <Text style={styles.btnSecondaryText}>Update Process</Text>
+                </TouchableOpacity>
+              ) : (
+                <TouchableOpacity
+                  style={styles.btnPrimary}
+                  onPress={handleStartTask}
+                >
+                  <Text style={styles.btnPrimaryText}>Start Task</Text>
+                </TouchableOpacity>
+              )}
+            </>
+          )}
+
+          {/* ✅ mechanic also gets the button */}
+          {canViewAcknowledgements && (
             <TouchableOpacity
-              style={styles.btnSecondary}
+              style={styles.btnSecondaryPurple}
               onPress={() =>
-                navigation.navigate("UpdateProcess", {
-                  requestId: request._id,
-                  request,
+                navigation?.navigate?.("Acknowledgements", {
+                  assetId: resolvedAssetId,
                 })
               }
             >
-              <Text style={styles.btnSecondaryText}>Update Process</Text>
-            </TouchableOpacity>
-          ) : (
-            <TouchableOpacity
-              style={styles.btnPrimary}
-              onPress={handleStartTask}
-            >
-              <Text style={styles.btnPrimaryText}>Start Task</Text>
+              <Text style={styles.btnSecondaryPurpleText}>
+                View Acknowledgements
+              </Text>
             </TouchableOpacity>
           )}
         </View>
@@ -455,11 +497,11 @@ const MaintenanceRequestCard = ({
       <ProductionSatisfactionModal
         isOpen={prodOpen}
         onClose={() => setProdOpen(false)}
-        assetId={assetDetails?._id || assetId}
-        assetName={assetDetails?.assetName || assetName}
+        assetId={resolvedAssetId}
+        assetName={assetName}
         onSuccess={() => {
           setProdOpen(false);
-          onRefresh?.(); // refresh so supervisor can complete
+          onRefresh?.();
         }}
       />
     </View>
@@ -482,14 +524,14 @@ export default function MaintenanceRequestsScreen({ navigation }) {
   const effectRan = useRef(false);
 
   const loadAllForSupervisor = useCallback(async () => {
-    const env = await api.get_all_maintenance_requests();
+    const env = await api.maintenanceAPI.getAllMaintenanceRequests();
     const normalized = normalizeAllRequestsData(env?.data || []);
     setAllRequests(normalized);
     return normalized;
   }, []);
 
   const loadAssignedForSupervisor = useCallback(async () => {
-    const env = await api.get_assets_with_mechanics();
+    const env = await api.maintenanceAPI.getAssetsWithMechanics();
     const normalized = normalizeAssignedRequestsData(env?.data || []);
     setAssignedRequests(normalized);
     return normalized;
@@ -505,11 +547,12 @@ export default function MaintenanceRequestsScreen({ navigation }) {
           loadAssignedForSupervisor(),
         ]);
       } else if (role === "mechanic") {
-        const env = await api.get_my_assigned_maintenances();
+        const env = await api.maintenanceAPI.getMyAssignedMaintenances();
         setAllRequests(normalizeRequestData(env?.data || [], role));
         setAssignedRequests([]);
       } else {
-        const env = await api.get_all_requests_with_mechanic(); // production
+        // production
+        const env = await api.maintenanceAPI.getAllRequestsWithMechanic();
         setAllRequests(normalizeRequestData(env?.data || [], role));
         setAssignedRequests([]);
       }
@@ -638,8 +681,7 @@ export default function MaintenanceRequestsScreen({ navigation }) {
    Styles
 ------------------------------------------------- */
 const styles = StyleSheet.create({
-  /* ---------- Shared / Layout ---------- */
-  screen: { flex: 1, backgroundColor: "#f8fafc" }, // optional: use on root <View>
+  screen: { flex: 1, backgroundColor: "#f8fafc" },
   center: {
     flex: 1,
     alignItems: "center",
@@ -647,7 +689,6 @@ const styles = StyleSheet.create({
     backgroundColor: "#f8fafc",
   },
 
-  /* ---------- Header ---------- */
   headerContainer: {
     paddingHorizontal: 16,
     paddingVertical: 14,
@@ -667,7 +708,6 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
 
-  /* ---------- Filters ---------- */
   filterRow: {
     paddingHorizontal: 12,
     paddingVertical: 10,
@@ -685,7 +725,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#e5e7eb",
     backgroundColor: "#ffffff",
-    // subtle lift
     shadowColor: "#000",
     shadowOpacity: 0.03,
     shadowOffset: { width: 0, height: 1 },
@@ -703,7 +742,6 @@ const styles = StyleSheet.create({
   chipText: { color: "#111827", fontWeight: "700", letterSpacing: 0.2 },
   chipTextActive: { color: "#ffffff" },
 
-  /* ---------- Card ---------- */
   card: {
     backgroundColor: "#ffffff",
     borderRadius: 16,
@@ -711,7 +749,6 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     borderWidth: 1,
     borderColor: "#e5e7eb",
-    // soft shadow
     shadowColor: "#000",
     shadowOpacity: 0.06,
     shadowOffset: { width: 0, height: 3 },
@@ -719,7 +756,6 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
 
-  /* ---------- Key–Value Text ---------- */
   kv: { color: "#374151", marginTop: 2 },
   k: {
     fontWeight: "800",
@@ -730,13 +766,11 @@ const styles = StyleSheet.create({
   },
   v: { fontWeight: "600", color: "#0f172a" },
 
-  /* ---------- Error / Retry ---------- */
   tryBtn: {
     backgroundColor: "#111827",
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderRadius: 12,
-    // lift
     shadowColor: "#000",
     shadowOpacity: 0.1,
     shadowOffset: { width: 0, height: 6 },
@@ -745,14 +779,12 @@ const styles = StyleSheet.create({
   },
   tryBtnText: { color: "#ffffff", fontWeight: "800", letterSpacing: 0.3 },
 
-  /* ---------- Buttons ---------- */
   btnPrimary: {
     marginTop: 10,
-    backgroundColor: "#2563eb", // blue-600
+    backgroundColor: "#2563eb",
     borderRadius: 12,
     paddingVertical: 12,
     alignItems: "center",
-    // lift
     shadowColor: "#000",
     shadowOpacity: 0.12,
     shadowOffset: { width: 0, height: 6 },
