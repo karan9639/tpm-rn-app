@@ -53,6 +53,7 @@ const normalizeAllRequestsData = (data) =>
           assetCode: item?.assetId?.assetCode || "N/A",
           assetStatus: item?.assetId?.assetStatus || "N/A",
           locationName: item?.assetId?.location?.locationName || "N/A",
+          locationCode: item?.assetId?.location?.locationCode || "N/A",
           underMaintenance: item?.assetId?.underMaintenance || false,
         },
         mechanicDetails: null,
@@ -85,6 +86,7 @@ const normalizeAssignedRequestsData = (data) =>
             assetCode: assetDetails?.assetCode || "N/A",
             assetStatus: assetDetails?.assetStatus || "N/A",
             locationName: assetDetails?.location?.locationName || "N/A",
+            locationCode: assetDetails?.location?.locationCode || "N/A",
           },
           mechanicDetails,
         };
@@ -104,6 +106,14 @@ const normalizeRequestData = (data, userRole) =>
             asset0.location[0]
               ? asset0.location[0].locationName
               : "N/A";
+
+          const locationCode =
+            asset0?.location &&
+            Array.isArray(asset0?.location) &&
+            asset0.location[0]
+              ? asset0.location[0].locationCode
+              : "N/A";
+
           const mechanic =
             item?.result &&
             item.result[0] &&
@@ -119,8 +129,8 @@ const normalizeRequestData = (data, userRole) =>
             priority: item?.priority || "Medium",
             remark: item?.remark || item?.description || "No remarks",
             assetDetails: asset0
-              ? { ...asset0, locationName }
-              : { assetName: "N/A", assetCode: "N/A", locationName: "N/A" },
+              ? { ...asset0, locationName, locationCode }
+              : { assetName: "N/A", assetCode: "N/A", locationName: "N/A", locationCode: "N/A" },
             mechanicDetails: mechanic,
           };
         }
@@ -145,6 +155,7 @@ const normalizeRequestData = (data, userRole) =>
               assetCode: item?.assetId?.assetCode || "N/A",
               assetStatus: item?.assetId?.assetStatus || "N/A",
               locationName: item?.assetId?.location?.locationName || "N/A",
+              locationCode: item?.assetId?.location?.locationCode || "N/A",
             },
             mechanicDetails: { _id: item?.mechanic },
           };
