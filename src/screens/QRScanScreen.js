@@ -9,8 +9,9 @@ import {
   Alert,
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { useRoute } from "@react-navigation/native";
+import { useIsFocused, useRoute } from "@react-navigation/native";
 import { CameraView, useCameraPermissions } from "expo-camera";
+import * as api from "../services/api";
 
 /* ----------------- helpers ----------------- */
 const safeDecode = (s) => {
@@ -72,23 +73,29 @@ function getAssetIdFrom(anything) {
 
 /* ----------------- screen ----------------- */
 export default function QRScanScreen({ navigation }) {
+  const isFocused = useIsFocused();
   const route = useRoute();
-  const { expectedAssetId, requestId, next } = route.params || {};
+  const { expectedAssetId, requestId, next } = route.params || {}; // may be undefined (QR icon flow)
 
   const [permission, requestPermission] = useCameraPermissions();
+
   const [ready, setReady] = useState(false);
   const [scanned, setScanned] = useState(false);
+  const [fetching, setFetching] = useState(false);
   const [err, setErr] = useState("");
-  const [fetching, setFetching] = useState(false); // just to reuse your UI text
   const throttleRef = useRef(0);
 
-  // ask permission on mount / when status changes
+  // ask permission when focused
   useEffect(() => {
     let alive = true;
     (async () => {
       setReady(false);
       setScanned(false);
       setErr("");
+      if (!isFocused) {
+        if (alive) setReady(true);
+        return;
+      }
       if (!permission || permission.status === "undetermined") {
         await requestPermission();
       }
@@ -97,66 +104,93 @@ export default function QRScanScreen({ navigation }) {
     return () => {
       alive = false;
     };
-  }, [permission?.status, requestPermission]);
+  }, [isFocused, permission?.status, requestPermission]);
 
-  const goToUpdateProcess = useCallback(
-    (rid) => {
+  const gotoAssetDetails = useCallback(
+    async (assetId) => {
+      setFetching(true);
+      setErr("");
+      try {
+        const res = await api.get_asset_details(assetId).catch(() => null);
+        const payload = res?.data ?? res ?? undefined;
+
+        navigation.replace("AssetDetails", {
+          assetId,
+          ...(payload ? { initialAsset: payload } : {}),
+          fromQR: true,
+        });
+      } catch (e) {
+        const msg = e?.message || "Failed to load asset.";
+        setErr(msg);
+        Alert.alert("Scan Result", msg, [{ text: "OK" }]);
+        setScanned(false);
+      } finally {
+        setFetching(false);
+      }
+    },
+    [navigation]
+  );
+
+  const gotoUpdateProcess = useCallback(async () => {
+    try {
+      setFetching(true);
+      if (requestId) {
+        await AsyncStorage.setItem(`started_req_${requestId}`, "1");
+      }
       if (next?.screen) {
         navigation.replace(next.screen, next.params || {});
       } else {
-        navigation.replace("UpdateProcess", { requestId: rid });
+        navigation.replace("UpdateProcess", { requestId });
       }
-    },
-    [navigation, next]
-  );
+    } catch (e) {
+      Alert.alert("Error", e?.message || "QR handling failed.", [
+        { text: "OK", onPress: () => setScanned(false) },
+      ]);
+    } finally {
+      setFetching(false);
+    }
+  }, [navigation, next, requestId]);
 
   const handleScanned = useCallback(
-    async ({ data }) => {
+    ({ data }) => {
       if (scanned || fetching) return;
 
       const now = Date.now();
-      if (now - throttleRef.current < 800) return; // simple debounce
+      if (now - throttleRef.current < 800) return; // debounce
       throttleRef.current = now;
 
       setScanned(true);
       setErr("");
 
       const scannedId = getAssetIdFrom(data);
-
-      if (!expectedAssetId) {
-        setErr("No expected asset ID provided by caller.");
-        Alert.alert("Scan Error", "Missing expected Asset ID. Try again.", [
-          { text: "OK", onPress: () => setScanned(false) },
+      if (!scannedId) {
+        setErr("Could not read asset ID from the QR code.");
+        Alert.alert("Invalid QR", "Could not read asset ID from the QR code.", [
+          { text: "Try again", onPress: () => setScanned(false) },
         ]);
         return;
       }
 
-      if (!scannedId || String(scannedId) !== String(expectedAssetId)) {
-        setErr("Scanned QR does not match the selected request’s asset.");
-        Alert.alert(
-          "Mismatch",
-          "Scanned QR code does not match this maintenance request’s asset.",
-          [{ text: "Try again", onPress: () => setScanned(false) }]
-        );
-        return;
-      }
-
-      try {
-        setFetching(true);
-        if (requestId) {
-          await AsyncStorage.setItem(`started_req_${requestId}`, "1");
+      // Mode A: Start Task flow (verify against expectedAssetId)
+      if (expectedAssetId) {
+        if (String(scannedId) !== String(expectedAssetId)) {
+          setErr("Scanned QR does not match the selected request’s asset.");
+          Alert.alert(
+            "Mismatch",
+            "Scanned QR code does not match this maintenance request’s asset.",
+            [{ text: "Try again", onPress: () => setScanned(false) }]
+          );
+          return;
         }
-        // jump straight to Update Process; remove scanner from stack
-        goToUpdateProcess(requestId);
-      } catch (e) {
-        Alert.alert("Error", e?.message || "QR handling failed.", [
-          { text: "OK", onPress: () => setScanned(false) },
-        ]);
-      } finally {
-        setFetching(false);
+        // Match OK -> mark started + go to UpdateProcess
+        gotoUpdateProcess();
+        return;
       }
+
+      // Mode B: QR icon flow (no expectedAssetId) -> open Asset Details
+      gotoAssetDetails(scannedId);
     },
-    [scanned, fetching, expectedAssetId, requestId, goToUpdateProcess]
+    [scanned, fetching, expectedAssetId, gotoAssetDetails, gotoUpdateProcess]
   );
 
   /* ---------- permission/ready UIs ---------- */
@@ -186,12 +220,14 @@ export default function QRScanScreen({ navigation }) {
   /* ----------------- view ----------------- */
   return (
     <View style={styles.container}>
-      <CameraView
-        style={styles.camera}
-        facing="back"
-        barcodeScannerSettings={{ barcodeTypes: ["qr"] }}
-        onBarcodeScanned={scanned ? undefined : handleScanned}
-      />
+      {isFocused && (
+        <CameraView
+          style={styles.camera}
+          facing="back"
+          barcodeScannerSettings={{ barcodeTypes: ["qr"] }}
+          onBarcodeScanned={scanned ? undefined : handleScanned}
+        />
+      )}
 
       {/* Overlay */}
       <View style={styles.overlay}>
@@ -199,7 +235,7 @@ export default function QRScanScreen({ navigation }) {
           <View style={styles.scanLine} />
         </View>
         <Text style={styles.caption}>
-          {fetching ? "Verifying asset…" : "Point your camera at a QR code"}
+          {fetching ? "Processing…" : "Point your camera at a QR code"}
         </Text>
         {!!err && (
           <Text
