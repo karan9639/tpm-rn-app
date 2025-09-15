@@ -18,6 +18,8 @@ import * as api from "../services/api";
 import { useAuth } from "../context/AuthContext";
 import MechanicAssignmentModal from "../components/MechanicAssignmentModal";
 import ProductionSatisfactionModal from "../components/ProductionSatisfactionModal";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useFocusEffect } from "@react-navigation/native";
 
 /* -----------------------------------------------
    Helpers (status + normalizers)
@@ -217,6 +219,7 @@ const MaintenanceRequestCard = ({
   const [isCompleting, setIsCompleting] = useState(false);
   const [assignOpen, setAssignOpen] = useState(false);
   const [prodOpen, setProdOpen] = useState(false);
+  const [startedOnce, setStartedOnce] = useState(false);
 
   // Pull production-satisfaction flags regardless of shape
   const getProductionSatisfactionStatus = () => {
@@ -268,6 +271,8 @@ const MaintenanceRequestCard = ({
   const isCompleted =
     request.status === "completed" || request.isActive === false;
 
+    const hasUpdateProcess = Boolean(acknowledgementId) || startedOnce;
+
   // ✅ same behavior as web: show button if we have an asset id
   const resolvedAssetId = assetDetails?._id || assetId;
   const canViewAcknowledgements = !!resolvedAssetId;
@@ -293,12 +298,34 @@ const MaintenanceRequestCard = ({
   const handleStartTask = () => {
     navigation.navigate("QRScan", {
       allowScan: true,
+      expectedAssetId:
+        request?.assetDetails?._id ||
+        request?.asset?.[0]?._id ||
+        request?.assetId,
+      requestId: request._id,
+      // where to go after first successful scan:
       next: {
         screen: "UpdateProcess",
         params: { requestId: request._id, request },
       },
     });
   };
+
+   // load “started” flag whenever the card/screen focuses or the id changes
+  useFocusEffect(
+    React.useCallback(() => {
+      let mounted = true;
+      const load = async () => {
+        try {
+          const v = await AsyncStorage.getItem(`started_req_${request?._id}`);
+          if (mounted) setStartedOnce(v === "1");
+        } catch {}
+      };
+      load();
+      return () => { mounted = false; };
+    }, [request?._id])
+  );
+
 
   return (
     <View style={styles.card}>
@@ -459,7 +486,7 @@ const MaintenanceRequestCard = ({
         <View>
           {!isCompleted && (
             <>
-              {acknowledgementId ? (
+              {hasUpdateProcess ? (
                 <TouchableOpacity
                   style={styles.btnSecondary}
                   onPress={() =>
@@ -590,6 +617,13 @@ export default function MaintenanceRequestsScreen({ navigation }) {
       effectRan.current = true;
     };
   }, [loadRequests]);
+
+ useFocusEffect(
+    React.useCallback(() => {
+      // lightweight refresh when the screen gains focus
+      loadRequests();
+    }, [loadRequests])
+  );
 
   const FILTERS = [
     { id: "all", label: "All" },

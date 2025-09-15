@@ -1,3 +1,4 @@
+// screens/QRScanScreen.js
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   View,
@@ -7,9 +8,9 @@ import {
   StyleSheet,
   Alert,
 } from "react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useRoute } from "@react-navigation/native";
 import { CameraView, useCameraPermissions } from "expo-camera";
-import { useIsFocused } from "@react-navigation/native";
-import * as api from "../services/api";
 
 /* ----------------- helpers ----------------- */
 const safeDecode = (s) => {
@@ -71,26 +72,23 @@ function getAssetIdFrom(anything) {
 
 /* ----------------- screen ----------------- */
 export default function QRScanScreen({ navigation }) {
-  const isFocused = useIsFocused();
-  const [permission, requestPermission] = useCameraPermissions();
+  const route = useRoute();
+  const { expectedAssetId, requestId, next } = route.params || {};
 
+  const [permission, requestPermission] = useCameraPermissions();
   const [ready, setReady] = useState(false);
   const [scanned, setScanned] = useState(false);
-  const [fetching, setFetching] = useState(false);
   const [err, setErr] = useState("");
+  const [fetching, setFetching] = useState(false); // just to reuse your UI text
   const throttleRef = useRef(0);
 
-  // ask permission when focused
+  // ask permission on mount / when status changes
   useEffect(() => {
     let alive = true;
     (async () => {
       setReady(false);
       setScanned(false);
       setErr("");
-      if (!isFocused) {
-        if (alive) setReady(true);
-        return;
-      }
       if (!permission || permission.status === "undetermined") {
         await requestPermission();
       }
@@ -99,66 +97,66 @@ export default function QRScanScreen({ navigation }) {
     return () => {
       alive = false;
     };
-  }, [isFocused, permission?.status, requestPermission]);
+  }, [permission?.status, requestPermission]);
 
-  const fetchAndGo = useCallback(
-    async (assetId) => {
-      setFetching(true);
-      setErr("");
-      try {
-        const res = await api.get_asset_details(assetId);
-        // Support {data: {...}} or direct {...}
-        const payload = res?.data ?? res;
-
-        if (
-          !payload ||
-          (typeof payload === "object" && Object.keys(payload).length === 0)
-        ) {
-          throw new Error("Asset not found.");
-        }
-
-        // Go to details – your AssetDetails screen already fetches by id,
-        // but we pass initialAsset to avoid a second spinner.
-        navigation.replace("AssetDetails", {
-          assetId,
-          initialAsset: payload,
-          fromQR: true,
-        });
-      } catch (e) {
-        const msg = e?.message || "Failed to load asset.";
-        setErr(msg);
-        Alert.alert("Scan Result", msg, [{ text: "OK" }]);
-        setScanned(false); // allow retry
-      } finally {
-        setFetching(false);
+  const goToUpdateProcess = useCallback(
+    (rid) => {
+      if (next?.screen) {
+        navigation.replace(next.screen, next.params || {});
+      } else {
+        navigation.replace("UpdateProcess", { requestId: rid });
       }
     },
-    [navigation]
+    [navigation, next]
   );
 
   const handleScanned = useCallback(
-    ({ data, type }) => {
+    async ({ data }) => {
       if (scanned || fetching) return;
 
       const now = Date.now();
-      if (now - throttleRef.current < 800) return;
+      if (now - throttleRef.current < 800) return; // simple debounce
       throttleRef.current = now;
 
       setScanned(true);
       setErr("");
 
-      const assetId = getAssetIdFrom(data);
-      if (!assetId) {
-        setErr("Could not read asset ID from the QR code.");
-        Alert.alert("Invalid QR", "Could not read asset ID from the QR code.", [
-          { text: "Try again", onPress: () => setScanned(false) },
+      const scannedId = getAssetIdFrom(data);
+
+      if (!expectedAssetId) {
+        setErr("No expected asset ID provided by caller.");
+        Alert.alert("Scan Error", "Missing expected Asset ID. Try again.", [
+          { text: "OK", onPress: () => setScanned(false) },
         ]);
         return;
       }
 
-      fetchAndGo(assetId);
+      if (!scannedId || String(scannedId) !== String(expectedAssetId)) {
+        setErr("Scanned QR does not match the selected request’s asset.");
+        Alert.alert(
+          "Mismatch",
+          "Scanned QR code does not match this maintenance request’s asset.",
+          [{ text: "Try again", onPress: () => setScanned(false) }]
+        );
+        return;
+      }
+
+      try {
+        setFetching(true);
+        if (requestId) {
+          await AsyncStorage.setItem(`started_req_${requestId}`, "1");
+        }
+        // jump straight to Update Process; remove scanner from stack
+        goToUpdateProcess(requestId);
+      } catch (e) {
+        Alert.alert("Error", e?.message || "QR handling failed.", [
+          { text: "OK", onPress: () => setScanned(false) },
+        ]);
+      } finally {
+        setFetching(false);
+      }
     },
-    [scanned, fetching, fetchAndGo]
+    [scanned, fetching, expectedAssetId, requestId, goToUpdateProcess]
   );
 
   /* ---------- permission/ready UIs ---------- */
@@ -188,14 +186,12 @@ export default function QRScanScreen({ navigation }) {
   /* ----------------- view ----------------- */
   return (
     <View style={styles.container}>
-      {isFocused && (
-        <CameraView
-          style={styles.camera}
-          facing="back"
-          barcodeScannerSettings={{ barcodeTypes: ["qr"] }}
-          onBarcodeScanned={scanned ? undefined : handleScanned}
-        />
-      )}
+      <CameraView
+        style={styles.camera}
+        facing="back"
+        barcodeScannerSettings={{ barcodeTypes: ["qr"] }}
+        onBarcodeScanned={scanned ? undefined : handleScanned}
+      />
 
       {/* Overlay */}
       <View style={styles.overlay}>
@@ -203,7 +199,7 @@ export default function QRScanScreen({ navigation }) {
           <View style={styles.scanLine} />
         </View>
         <Text style={styles.caption}>
-          {fetching ? "Fetching asset…" : "Point your camera at a QR code"}
+          {fetching ? "Verifying asset…" : "Point your camera at a QR code"}
         </Text>
         {!!err && (
           <Text
